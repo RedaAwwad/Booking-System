@@ -59,7 +59,7 @@ export class AmadeusService {
     departureDate: string;
     returnDate: string;
     adults: number;
-    max: number;
+    max?: number;
   }) {
     const token = await this.getAccessToken();
     const baseUrl = this.configService.get<string>('AMADEUS_BASE_URL') || 'https://test.api.amadeus.com';
