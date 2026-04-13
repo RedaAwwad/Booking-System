@@ -1,35 +1,25 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { FlightSearchDto } from './DTO/flight-search.dto';
 import { FlightAdapter } from './adapters/flight.adapter';
-import { AmadeusService } from 'src/providers/amadeus.service';
-import { SkyscannerService } from 'src/providers/skyscanner.service';
+import { DuffelService } from '../providers/duffel.service';
 
 @Injectable()
 export class AggregatorService {
   private readonly logger = new Logger(AggregatorService.name);
   private readonly REQUEST_TIMEOUT_MS = 5000; // Equivalent to timeoutInSeconds
-private readonly USE_FAKE_DATA = true;
   constructor(
-    private readonly amadeus: AmadeusService,
-    private readonly skyscanner: SkyscannerService,
+    private readonly duffel: DuffelService,
   ) {}
   
   async searchAllFlights(query: FlightSearchDto) {
-    const skyscannerParams = FlightAdapter.toSkyscannerParams(query);
-    // 1. SCATTER: Define the tasks
-    // We wrap them in a helper so we can track the name during processing
     const tasks = [
       { 
-        name: 'Amadeus', 
-        call: this.amadeus.searchFlightOffers(query) 
-      },
-      { 
-        name: 'Skyscanner', 
-        call: this.skyscanner.searchFlights(skyscannerParams) 
+        name: 'Duffel', 
+        call: this.duffel.searchFlightOffers(query) 
       },
     ];
 
-    // 2. EXECUTE with Timeout (The "get(timeout, units)" part of your Java code)
+    // 2. EXECUTE with Timeout
     const results = await Promise.allSettled(
       tasks.map(task => this.withTimeout(task.call, this.REQUEST_TIMEOUT_MS))
     );
@@ -37,15 +27,13 @@ private readonly USE_FAKE_DATA = true;
     const finalData: any[] = [];
     const finalErrors: any[] = [];
 
-    // 3. GATHER (The stream filter/map part of your Java code)
+    // 3. GATHER
     results.forEach((result, index) => {
       const providerName = tasks[index].name;
 
       if (result.status === 'fulfilled') {
-        // APPLY ADAPTER HERE
         const normalized = result.value.map(item => {
-          if (providerName === 'Amadeus') return FlightAdapter.fromAmadeus(item);
-          if (providerName === 'Skyscanner') return FlightAdapter.fromSkyscanner(item);
+          if (providerName === 'Duffel') return FlightAdapter.fromDuffel(item);
           return item;
         });
         finalData.push(...(normalized || []));

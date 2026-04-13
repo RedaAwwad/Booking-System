@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
-import { AmadeusService } from './amadeus.service';
-import { SkyscannerService } from './skyscanner.service';
 import { HttpModule } from '@nestjs/axios';
+import { DuffelService } from './duffel.service';
 
 @Module({
     imports: [HttpModule],
-    providers: [AmadeusService , SkyscannerService],
-    exports: [AmadeusService , SkyscannerService]
+    providers: [DuffelService],
+    exports: [DuffelService]
 })
 export class ProvidersModule {}
