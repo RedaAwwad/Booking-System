@@ -1,12 +1,17 @@
 import { Module } from '@nestjs/common';
-import { AggregatorService } from './aggrecator.service';
-import { AggrecatorController } from './aggrecator.controller';
+
 import { ProvidersModule } from 'src/providers/providers.module';
+import { FlightAggregatorPublicServiceImpl } from './flight-aggregator.public-service';
 
 @Module({
-    providers: [AggregatorService],
-    controllers: [AggrecatorController],
-    exports: [AggregatorService],    
+    providers: [
+        {
+            provide: 'FlightAggregatorPublicService',
+            useClass: FlightAggregatorPublicServiceImpl,
+        }
+    ],
+    controllers: [],
+    exports: ['FlightAggregatorPublicService'],
     imports: [ProvidersModule],
-}) 
-export class AggrecatorModule {}
+})
+export class AggrecatorModule { }

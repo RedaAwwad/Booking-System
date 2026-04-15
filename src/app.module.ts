@@ -3,10 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
-import { AggrecatorController } from './aggrecator/aggrecator.controller';
-import { AggregatorService } from './aggrecator/aggrecator.service';
 import { AggrecatorModule } from './aggrecator/aggrecator.module';
 import { ProvidersModule } from './providers/providers.module';
+import { FlightController } from './aggrecator/flight.controller';
 
 @Module({
   imports: [
@@ -14,7 +13,7 @@ import { ProvidersModule } from './providers/providers.module';
     AggrecatorModule,
     ProvidersModule,
   ],
-  controllers: [AppController, AggrecatorController],
-  providers: [AppService, AggregatorService],
+  controllers: [AppController,FlightController],
+  providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

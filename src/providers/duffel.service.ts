@@ -1,9 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Duffel } from '@duffel/api';
+import { IFlightProvider } from './interfaces/flight-provider.interface';
+import { FlightSearchDto } from '../aggrecator/DTO/flight-search.dto';
+import { FlightAdapter } from '../aggrecator/adapters/flight.adapter';
+import { NormalizedFlight } from '../aggrecator/interfaces/flight.interface';
 
 @Injectable()
-export class DuffelService {
+export class DuffelService implements IFlightProvider {
+  readonly providerName = 'Duffel';
   private readonly logger = new Logger(DuffelService.name);
   private duffel: Duffel;
 
@@ -21,14 +26,7 @@ export class DuffelService {
   /**
    * Search for flight offers using Duffel API
    */
-  async searchFlightOffers(params: {
-    originLocationCode: string;
-    destinationLocationCode: string;
-    departureDate: string;
-    returnDate?: string;
-    adults: number;
-    max?: number;
-  }) {
+  async searchFlights(params: FlightSearchDto): Promise<NormalizedFlight[]> {
     try {
       const passengers = Array.from({ length: params.adults }, () => ({
         type: 'adult' as const,
@@ -59,7 +57,8 @@ export class DuffelService {
       });
 
       // 2. The offers are returned within the offerRequest object
-      return offerRequest.data.offers;
+      const rawOffers = offerRequest.data.offers;
+      return rawOffers.map(offer => FlightAdapter.fromDuffel(offer));
     } catch (error) {
       this.logger.error(`Duffel API Error: ${error.message}`, error.stack);
       throw error;

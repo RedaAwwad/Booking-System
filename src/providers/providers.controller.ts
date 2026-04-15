@@ -8,6 +8,6 @@ export class ProvidersController {
 
   @Get('duffel/search')
   async searchDuffel(@Query() query: FlightSearchDto) {
-    return this.duffelService.searchFlightOffers(query);
+    return this.duffelService.searchFlights(query);
   }
 }

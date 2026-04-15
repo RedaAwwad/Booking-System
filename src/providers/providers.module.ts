@@ -4,7 +4,14 @@ import { DuffelService } from './duffel.service';
 
 @Module({
     imports: [HttpModule],
-    providers: [DuffelService],
-    exports: [DuffelService]
+    providers: [
+        DuffelService,
+        {
+            provide: 'FLIGHT_PROVIDERS',
+            useFactory: (duffel: DuffelService) => [duffel],
+            inject: [DuffelService],
+        }
+    ],
+    exports: [DuffelService, 'FLIGHT_PROVIDERS']
 })
 export class ProvidersModule {}
