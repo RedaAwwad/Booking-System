@@ -1,17 +1,24 @@
 import { Module } from '@nestjs/common';
 
 import { ProvidersModule } from 'src/providers/providers.module';
-import { FlightAggregatorPublicServiceImpl } from './flight-aggregator.public-service';
+import { CacheServiceImpl } from './services/cache.service';
+import { ProviderAggregationServiceImpl } from './services/provider-aggregation.service';
+import { SearchService } from './services/search.service';
 
 @Module({
     providers: [
         {
-            provide: 'FlightAggregatorPublicService',
-            useClass: FlightAggregatorPublicServiceImpl,
-        }
+            provide: 'ICacheService',
+            useClass: CacheServiceImpl,
+        },
+        {
+            provide: 'IProviderAggregationService',
+            useClass: ProviderAggregationServiceImpl,
+        },
+        SearchService,
     ],
     controllers: [],
-    exports: ['FlightAggregatorPublicService'],
+    exports: [SearchService],
     imports: [ProvidersModule],
 })
 export class AggrecatorModule { }

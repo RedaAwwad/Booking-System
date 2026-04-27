@@ -1,5 +1,5 @@
 // src/aggregator/interfaces/flight.interface.ts
-export interface NormalizedFlight {
+export interface Flight {
   source: string;
   id: string;
   price: number;

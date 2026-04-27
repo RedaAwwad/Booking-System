@@ -1,10 +1,10 @@
 // src/aggregator/adapters/flight.adapter.ts
 import { FlightSearchDto } from "../DTO/flight-search.dto";
-import { NormalizedFlight } from "../interfaces/flight.interface";
+import { Flight } from "../interfaces/flight.interface";
 
 export class FlightAdapter {
   
-  static fromDuffel(raw: any): NormalizedFlight {
+  static fromDuffel(raw: any): Flight {
     return {
       source: 'Duffel',
       id: raw.id,

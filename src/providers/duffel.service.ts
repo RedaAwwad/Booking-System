@@ -4,7 +4,7 @@ import { Duffel } from '@duffel/api';
 import { IFlightProvider } from './interfaces/flight-provider.interface';
 import { FlightSearchDto } from '../aggrecator/DTO/flight-search.dto';
 import { FlightAdapter } from '../aggrecator/adapters/flight.adapter';
-import { NormalizedFlight } from '../aggrecator/interfaces/flight.interface';
+import { Flight } from '../aggrecator/interfaces/flight.interface';
 
 @Injectable()
 export class DuffelService implements IFlightProvider {
@@ -26,7 +26,7 @@ export class DuffelService implements IFlightProvider {
   /**
    * Search for flight offers using Duffel API
    */
-  async searchFlights(params: FlightSearchDto): Promise<NormalizedFlight[]> {
+  async searchFlights(params: FlightSearchDto): Promise<Flight[]> {
     try {
       const passengers = Array.from({ length: params.adults }, () => ({
         type: 'adult' as const,
