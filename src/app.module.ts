@@ -8,25 +8,28 @@ import { ProvidersModule } from './providers/providers.module';
 import { FlightController } from './aggrecator/flight.controller';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
+import { FlightsModule } from './flights/flights.module';
+import { FlightsController } from './flights/flights.controller';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    CacheModule.registerAsync({
-      isGlobal: true,
-      useFactory: async () => ({
-        store: await redisStore({
-          socket: {
-            host: 'localhost',
-            port: 6379,
-          },
-        }),
-      }),
-    }),
-    AggrecatorModule,
-    ProvidersModule,
+    // ConfigModule.forRoot({ isGlobal: true }),
+    // CacheModule.registerAsync({
+    //   isGlobal: true,
+    //   useFactory: async () => ({
+    //     store: await redisStore({
+    //       socket: {
+    //         host: 'localhost',
+    //         port: 6379,
+    //       },
+    //     }),
+    //   }),
+    // }),
+    // AggrecatorModule,
+    // ProvidersModule,
+    FlightsModule,
   ],
-  controllers: [AppController,FlightController],
+  controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
