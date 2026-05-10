@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+import { SanitizePipe } from './sanitize/sanitize.pipe';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -11,10 +12,12 @@ async function bootstrap() {
   });
 
   app.useGlobalPipes(
+    new SanitizePipe(), // custom pipe to sanitize inputs from XSS attacks
     new ValidationPipe({
-      transform: true, // auto-transform query strings to correct types
+      transform: true, // auto-transform query strings to expected types
       whitelist: true, // strip unknown properties
       forbidNonWhitelisted: true, // throw error if unknown props are sent
+      transformOptions: { enableImplicitConversion: true },
     }),
   );
 

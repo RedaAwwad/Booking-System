@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Escape, Trim } from 'class-sanitizer';
 import { Type } from 'class-transformer';
 import {
-  IsDate,
+  IsDateString,
   IsEnum,
+  IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   Min,
@@ -21,6 +22,8 @@ export class SearchFlightDto {
     description: 'IATA code for the origin city or airport',
     example: 'LHR',
   })
+  @Escape()
+  @Trim()
   @IsNotEmpty()
   @IsString()
   origin: string;
@@ -29,6 +32,8 @@ export class SearchFlightDto {
     description: 'IATA code for the destination city or airport',
     example: 'JFK',
   })
+  @Escape()
+  @Trim()
   @IsNotEmpty()
   @IsString()
   destination: string;
@@ -38,17 +43,15 @@ export class SearchFlightDto {
     example: '2024-06-01',
   })
   @IsNotEmpty()
-  @IsDate()
-  @Type(() => Date)
-  departure_date: Date;
+  @IsDateString()
+  departure_date: string;
 
   @ApiPropertyOptional({
     description: 'Return date in YYYY-MM-DD format for round trips',
     example: '2024-06-15',
   })
   @IsOptional()
-  @IsDate()
-  @Type(() => Date)
+  @IsDateString()
   return_date?: Date;
 
   @ApiProperty({
@@ -66,7 +69,8 @@ export class SearchFlightDto {
     example: 1,
   })
   @IsNotEmpty()
-  @IsNumber()
+  @IsInt()
+  @Type(() => Number)
   @Min(0)
   adults_count: number;
 
@@ -76,7 +80,8 @@ export class SearchFlightDto {
     example: 0,
   })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Type(() => Number)
   @Min(0)
   children_count?: number;
 
@@ -84,6 +89,8 @@ export class SearchFlightDto {
     description: 'Currency code for pricing',
     example: 'USD',
   })
+  @Escape()
+  @Trim()
   @IsOptional()
   @IsString()
   currency?: string;
@@ -94,7 +101,8 @@ export class SearchFlightDto {
     example: 10,
   })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Type(() => Number)
   @Min(1)
   limit?: number;
 
@@ -104,7 +112,8 @@ export class SearchFlightDto {
     example: 0,
   })
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Type(() => Number)
   @Min(0)
   offset?: number;
 }

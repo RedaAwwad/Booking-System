@@ -5,8 +5,6 @@ import { SearchFlightDto } from './dto/search-flight.dto';
 @Injectable()
 export class FlightsService {
   findAll(query: SearchFlightDto) {
-    console.log(query);
-
     return query;
   }
 
