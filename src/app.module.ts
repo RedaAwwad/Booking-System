@@ -10,6 +10,7 @@ import { FlightsModule } from './flights/flights.module';
 // import { CacheModule } from '@nestjs/cache-manager';
 // import { redisStore } from 'cache-manager-redis-yet';
 // import { FlightsController } from './flights/flights.controller';
+import { ProvidersModule } from './providers/providers.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { FlightsModule } from './flights/flights.module';
     // AggrecatorModule,
     // ProvidersModule,
     FlightsModule,
+    ProvidersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
