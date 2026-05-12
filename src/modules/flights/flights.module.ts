@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { FlightsController } from './flights.controller';
 import { FlightsService } from './flights.service';
-import { AggregatorModule } from '../aggregator/aggregator.module';
+import { ExternalApiModule } from '../external-api/external-api.module';
 
 @Module({
-  imports: [AggregatorModule],
+  imports: [ExternalApiModule],
   controllers: [FlightsController],
   providers: [FlightsService],
 })

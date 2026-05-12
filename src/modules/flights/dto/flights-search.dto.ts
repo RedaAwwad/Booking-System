@@ -10,14 +10,9 @@ import {
   IsString,
   Min,
 } from 'class-validator';
+import { CabinClass } from '../flights.types';
 
-export enum CabinClass {
-  ECONOMY = 'economy',
-  BUSINESS = 'business',
-  FIRST = 'first',
-}
-
-export class SearchFlightDto {
+export class FlightsSearchDto {
   @ApiProperty({
     description: 'IATA code for the origin city or airport',
     example: 'LHR',

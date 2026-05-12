@@ -10,7 +10,7 @@ import {
   Min,
 } from 'class-validator';
 
-export class SearchHotelDto {
+export class HotelsSearchDto {
   @ApiProperty({
     description: 'City or destination name',
     example: 'New York',

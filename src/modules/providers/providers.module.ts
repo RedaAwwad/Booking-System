@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
 import { DuffelFlightsAdapter } from './duffel/duffel-flights.adapter';
-import { FlightApiAdapter } from './flightapi/flight-api.adapter';
+import { FlightApiAdapter } from './flightapi/flightapi.adapter';
 
 @Module({
   imports: [ConfigModule, HttpModule],
@@ -23,4 +23,3 @@ import { FlightApiAdapter } from './flightapi/flight-api.adapter';
   exports: ['FLIGHT_PROVIDERS'],
 })
 export class ProvidersModule {}
-

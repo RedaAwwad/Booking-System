@@ -1,13 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { FlightAggregatorService } from '../aggregator/flight-aggregator.service';
-import { SearchFlightDto } from './dto/search-flight.dto';
+import { FlightExternalApiService } from '../external-api/flight-external-api.service';
+import { FlightsSearchDto } from './dto/flights-search.dto';
+import { Flight } from './flights.types';
 
 @Injectable()
 export class FlightsService {
-  constructor(private readonly aggregator: FlightAggregatorService) {}
+  constructor(private readonly externalApiService: FlightExternalApiService) {}
 
-  async search(query: SearchFlightDto) {
-    return this.aggregator.aggregate(query);
+  async search(
+    query: FlightsSearchDto,
+  ): Promise<{ data: Flight[]; errors: string[] }> {
+    return await this.externalApiService.handle(query);
   }
 
   // Other methods (create, findOne) can be added here

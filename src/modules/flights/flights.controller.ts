@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FlightsService } from './flights.service';
-import { SearchFlightDto } from './dto/search-flight.dto';
+import { FlightsSearchDto } from './dto/flights-search.dto';
 
 @ApiTags('flights')
 @Controller('flights')
@@ -18,7 +18,7 @@ export class FlightsController {
     status: 400,
     description: 'Bad Request - Validation failed for search criteria.',
   })
-  search(@Query() query: SearchFlightDto) {
+  search(@Query() query: FlightsSearchDto) {
     return this.flightsService.search(query);
   }
 }

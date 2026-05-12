@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { HotelsSearchDto } from './dto/hotels-search.dto';
 import { HotelsService } from './hotels.service';
-import { SearchHotelDto } from './dto/search-hotel.dto';
 
 @ApiTags('hotels')
 @Controller('hotels')
@@ -18,8 +18,7 @@ export class HotelsController {
     status: 400,
     description: 'Bad Request - Validation failed for search criteria.',
   })
-  search(@Query() query: SearchHotelDto) {
+  search(@Query() query: HotelsSearchDto) {
     return this.hotelsService.search(query);
   }
 }
-

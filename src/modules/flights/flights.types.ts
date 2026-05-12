@@ -1,3 +1,9 @@
+export enum CabinClass {
+  ECONOMY = 'economy',
+  BUSINESS = 'business',
+  FIRST = 'first',
+}
+
 export interface Flight {
   id: string;
   source: string;
@@ -9,5 +15,5 @@ export interface Flight {
   arrivalTime: Date;
   price: number;
   currency: string;
-  cabinClass?: string;
+  cabinClass?: CabinClass;
 }
