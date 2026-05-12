@@ -17,10 +17,11 @@ import { Flight } from 'src/modules/flights/flights.types';
 @Injectable()
 export class DuffelFlightsAdapter implements IFlightProvider {
   readonly providerName = 'Duffel';
-  private readonly logger = new Logger(this.providerName);
+  private readonly logger: Logger;
   private duffel: Duffel;
 
   constructor(private readonly configService: ConfigService) {
+    this.logger = new Logger(this.providerName);
     const token = this.configService.get<string>('DUFFEL_API_TOKEN');
     this.duffel = new Duffel({
       token: token ?? '',
@@ -80,6 +81,8 @@ export class DuffelFlightsAdapter implements IFlightProvider {
 
   formatFlightResponse<T>(providerFlight: T): Flight {
     const flight = providerFlight as DuffelFlightOffer;
+
+    this.logger.warn('flight = > ', flight);
 
     return {
       id: flight.id,

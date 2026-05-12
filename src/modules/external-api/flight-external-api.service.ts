@@ -2,15 +2,21 @@ import { Injectable, Logger, Inject } from '@nestjs/common';
 import { IFlightProvider } from '../providers/interfaces/flight-provider.interface';
 import { Flight } from '../flights/flights.types';
 import { FlightsSearchDto } from '../flights/dto/flights-search.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class FlightExternalApiService {
-  private readonly logger = new Logger(FlightExternalApiService.name);
-  private readonly TIMEOUT_MS = 10000;
+  private logger: Logger;
+  private timeoutInMilliseconds: number;
 
   constructor(
+    private readonly configService: ConfigService,
     @Inject('FLIGHT_PROVIDERS') private readonly providers: IFlightProvider[],
-  ) {}
+  ) {
+    this.logger = new Logger(FlightExternalApiService.name);
+    const timeout = this.configService.get<string>('SCATTER_GATHER_TIMEOUT');
+    this.timeoutInMilliseconds = Number(timeout);
+  }
 
   async handle(
     query: FlightsSearchDto,
@@ -23,7 +29,7 @@ export class FlightExternalApiService {
       this.providers.map((provider) =>
         this.withTimeout(
           provider.searchFlights(query),
-          this.TIMEOUT_MS,
+          this.timeoutInMilliseconds,
           provider.providerName,
         ),
       ),
