@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { HotelsController } from './hotels.controller';
 import { HotelsService } from './hotels.service';
-import { AggregatorModule } from '../aggregator/aggregator.module';
+import { ExternalApiModule } from '../external-api/external-api.module';
 
 @Module({
-  imports: [AggregatorModule],
+  imports: [ExternalApiModule],
   controllers: [HotelsController],
   providers: [HotelsService],
 })

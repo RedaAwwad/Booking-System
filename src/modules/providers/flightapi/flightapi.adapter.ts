@@ -20,7 +20,7 @@ import { Flight, CabinClass } from '../../flights/flights.types';
 
 @Injectable()
 export class FlightApiAdapter implements IFlightProvider {
-  readonly providerName = 'FlightAPI';
+  readonly providerName = 'Flightapi';
   private readonly logger: Logger;
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -39,12 +39,14 @@ export class FlightApiAdapter implements IFlightProvider {
       const url = this.buildUrl(query);
       this.logger.log('url = > ', url);
       this.logger.log(
-        `Fetching from FlightAPI: ${url.replace(this.apiKey, '***')}`,
+        `Fetching from ${this.providerName}: ${url.replace(this.apiKey, '***')}`,
       );
       const response = await firstValueFrom(this.httpService.get(url));
 
       if (response.status !== 200) {
-        throw new Error(`FlightAPI returned status ${response.status}`);
+        throw new Error(
+          `${this.providerName} returned status ${response.status}`,
+        );
       }
 
       const data = response.data as FlightapiResponse;
@@ -64,12 +66,14 @@ export class FlightApiAdapter implements IFlightProvider {
         })
         .filter((f): f is Flight => f !== null);
     } catch (error) {
-      this.logger.error(`FlightAPI Error: ${(error as Error).message}`);
+      this.logger.error(
+        `${this.providerName} Error: ${(error as Error).message}`,
+      );
       if ((error as FlightapiError).response?.status === 401) {
-        throw new UnauthorizedException('Invalid FlightAPI key');
+        throw new UnauthorizedException(`Invalid ${this.providerName} key`);
       }
       throw new BadRequestException(
-        `FlightAPI failure: ${(error as Error).message}`,
+        `${this.providerName} failure: ${(error as Error).message}`,
       );
     }
   }
@@ -77,7 +81,7 @@ export class FlightApiAdapter implements IFlightProvider {
   private buildUrl(query: FlightsSearchDto): string {
     const adults = query.adults_count || 1;
     const children = query.children_count || 0;
-    const infants = 0; // FlightAPI requires infants count
+    const infants = 0; // Flightapi requires infants count
     const cabin = this.mapCabinClass(query.cabin_class);
     const currency = query.currency || 'USD';
 
