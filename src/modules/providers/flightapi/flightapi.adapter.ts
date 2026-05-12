@@ -37,10 +37,6 @@ export class FlightApiAdapter implements IFlightProvider {
   async searchFlights(query: FlightsSearchDto): Promise<Flight[]> {
     try {
       const url = this.buildUrl(query);
-      this.logger.log('url = > ', url);
-      this.logger.log(
-        `Fetching from ${this.providerName}: ${url.replace(this.apiKey, '***')}`,
-      );
       const response = await firstValueFrom(this.httpService.get(url));
 
       if (response.status !== 200) {
