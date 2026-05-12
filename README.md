@@ -79,4 +79,4 @@ $ npm run test:e2e
 ```
 
 ## 📄 License
-This project is [UNLICENSED](LICENSE).
+This project is [MIT licensed](LICENSE).
