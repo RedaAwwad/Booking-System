@@ -6,11 +6,10 @@ import { IPaymentStrategy, PaymentInitiationResult, PaymentCaptureResult } from 
 export class CODStrategy implements IPaymentStrategy {
     async createPaymentIntent(
         amount: number,
-        metadata: { orderId: string; bookingId: string; email: string },
-        idempotencyKey: string,
+        orderId: string, bookingId: string, email: string,
     ): Promise<PaymentInitiationResult> {
         return {
-            paymentIntentId: `COD_${metadata.orderId}`,
+            paymentIntentId: `COD_${orderId}`,
         };
     }
 

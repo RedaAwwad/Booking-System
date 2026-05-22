@@ -14,12 +14,9 @@ export interface PaymentCaptureResult {
 export interface IPaymentStrategy {
     createPaymentIntent(
         amount: number,
-        metadata: {
-            orderId: string;
-            bookingId: string;
-            email: string;
-        },
-        idempotencyKey: string,
+        orderId: string,
+        bookingId: string,
+        email: string
     ): Promise<PaymentInitiationResult>;
 
     capturePayment(

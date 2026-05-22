@@ -17,8 +17,7 @@ export class PayPalStrategy implements IPaymentStrategy {
 
     async createPaymentIntent(
         amount: number,
-        metadata: { orderId: string; bookingId: string; email: string },
-        idempotencyKey: string,
+        orderId: string, bookingId: string, email: string
     ): Promise<PaymentInitiationResult> {
         const request = new checkoutNodeJssdk.orders.OrdersCreateRequest();
         request.prefer('return=representation');
@@ -26,9 +25,9 @@ export class PayPalStrategy implements IPaymentStrategy {
             intent: 'CAPTURE',
             purchase_units: [
                 {
-                    reference_id: metadata.orderId,
-                    custom_id: metadata.orderId,
-                    description: `Booking ${metadata.bookingId}`,
+                    reference_id: orderId,
+                    custom_id: orderId,
+                    description: `Booking ${bookingId}`,
                     amount: {
                         currency_code: 'USD',
                         value: amount.toFixed(2),
@@ -39,8 +38,8 @@ export class PayPalStrategy implements IPaymentStrategy {
                 brand_name: 'Booking System',
                 landing_page: 'NO_PREFERENCE',
                 user_action: 'PAY_NOW',
-                return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/success?orderId=${metadata.orderId}`,
-                cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/cancel?orderId=${metadata.orderId}`,
+                return_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/success?orderId=${orderId}`,
+                cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/cancel?orderId=${orderId}`,
             },
         });
 
@@ -62,9 +61,11 @@ export class PayPalStrategy implements IPaymentStrategy {
         paymentIntentId: string,
         orderId: string,
     ): Promise<PaymentCaptureResult> {
-        const request = new checkoutNodeJssdk.orders.OrdersCaptureRequest(paymentIntentId);
+        //paymentIntentId is at paypal
+        const request = new checkoutNodeJssdk.orders.OrdersCaptureReques(paymentIntentId);
         request.requestBody({});
 
+        //The transactionid is the same as paymentintentid
         try {
             const response = await this.paypalClient.execute(request);
             const status = response.result.status;

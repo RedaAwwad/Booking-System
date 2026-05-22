@@ -22,7 +22,7 @@ export class PaymentService {
 
     async initiatePayment(dto: InitiatePaymentDto) {
         const orderId = `order_${uuidv4()}`;
-        const idempotencyKey = `order_${orderId}`;
+        const idempotencyKey = orderId;
 
         // Idempotency check
         const existing = await this.attemptRepo.findByIdempotencyKey(idempotencyKey);
@@ -68,15 +68,13 @@ export class PaymentService {
         const strategy = this.strategyFactory.getStrategy(dto.provider);
         const result = await strategy.createPaymentIntent(
             dto.amount,
-            {
-                orderId,
-                bookingId: dto.bookingId,
-                email: dto.email,
-            },
-            idempotencyKey,
+            orderId,
+            dto.bookingId,
+            dto.email
+
         );
 
-        // Update attempt with provider's transaction ID
+        // Add result
         await this.attemptRepo.updateAttempt(idempotencyKey, {
             transactionId: result.paymentIntentId,
             responseData: result,

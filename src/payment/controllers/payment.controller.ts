@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { PaymentService } from '../services/payment.service';
 import { InitiatePaymentDto } from '../dto/initiate-payment.dto';
-import { CapturePaymentDto } from '../dto/capture-payment.dto';
 
 @Controller('payments')
 export class PaymentController {
