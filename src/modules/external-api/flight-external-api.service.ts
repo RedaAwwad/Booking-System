@@ -3,6 +3,8 @@ import { IFlightProvider } from '../providers/interfaces/flight-provider.interfa
 import { Flight } from '../flights/flights.types';
 import { FlightsSearchDto } from '../flights/dto/flights-search.dto';
 import { ConfigService } from '@nestjs/config';
+import { CacheServiceImpl } from '../../common/cache/cache.service';
+import { buildCacheKey } from '../../common/cache/cache-key.util';
 
 @Injectable()
 export class FlightExternalApiService {
@@ -12,6 +14,7 @@ export class FlightExternalApiService {
   constructor(
     private readonly configService: ConfigService,
     @Inject('FLIGHT_PROVIDERS') private readonly providers: IFlightProvider[],
+    private readonly cacheService: CacheServiceImpl,
   ) {
     this.logger = new Logger(FlightExternalApiService.name);
     const timeout = this.configService.get<string>('SCATTER_GATHER_TIMEOUT');
@@ -21,8 +24,17 @@ export class FlightExternalApiService {
   async handle(
     query: FlightsSearchDto,
   ): Promise<{ data: Flight[]; errors: any[] }> {
+    const cacheKey = buildCacheKey('flights', query);
+
+    const cached =
+      await this.cacheService.get<{ data: Flight[]; errors: any[] }>(cacheKey);
+    if (cached) {
+      this.logger.log(`Cache HIT — key: ${cacheKey}`);
+      return cached;
+    }
+
     this.logger.log(
-      `Starting aggregation for ${this.providers.length} providers: ${this.providers.map((p) => p.providerName).join(', ')}`,
+      `Cache MISS — starting aggregation for ${this.providers.length} providers: ${this.providers.map((p) => p.providerName).join(', ')}`,
     );
 
     const results = await Promise.allSettled(
@@ -53,7 +65,14 @@ export class FlightExternalApiService {
       }
     });
 
-    return { data, errors };
+    const response = { data, errors };
+
+    if (data.length > 0) {
+      await this.cacheService.set(cacheKey, response);
+      this.logger.log(`Cached ${data.length} results — key: ${cacheKey}`);
+    }
+
+    return response;
   }
 
   private withTimeout<T>(
