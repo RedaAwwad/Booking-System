@@ -1,0 +1,34 @@
+# Dependencies & build output (installed/built inside the image)
+node_modules
+dist
+build
+coverage
+
+# Secrets: inject via env_file at runtime, never bake into the image
+.env
+.env.*
+!.env.example
+
+# Git & IDE noise
+.git
+.gitignore
+.idea
+.vscode
+
+# Tests & scratch scripts (not needed in the runtime image)
+test
+scratch
+**/*.spec.ts
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Docker meta files (avoid recursive context noise)
+Dockerfile*
+docker-compose*.yml
+
+# Docs
+README.md
