@@ -35,7 +35,7 @@ export class FlightsSearchDto {
 
   @ApiProperty({
     description: 'Departure date in YYYY-MM-DD format',
-    example: '2024-06-01',
+    example: '2026-06-30',
   })
   @IsNotEmpty()
   @IsDateString()
@@ -43,7 +43,7 @@ export class FlightsSearchDto {
 
   @ApiPropertyOptional({
     description: 'Return date in YYYY-MM-DD format for round trips',
-    example: '2024-06-15',
+    example: '2026-07-15',
   })
   @IsOptional()
   @IsDateString()
