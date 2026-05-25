@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16
     container_name: booking_postgres
     restart: unless-stopped
     ports:
@@ -23,7 +23,8 @@ services:
       POSTGRES_DB: ${DATABASE_NAME}
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-    command: postgres -c 'max_connections=200'
+    entrypoint: >
+      bash -c "apt-get update && apt-get install -y postgresql-16-cron && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=$${POSTGRES_DB} -c max_connections=200"
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine

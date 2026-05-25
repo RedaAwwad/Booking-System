@@ -26,8 +26,10 @@ export class FlightExternalApiService {
   ): Promise<{ data: Flight[]; errors: any[] }> {
     const cacheKey = buildCacheKey('flights', query);
 
-    const cached =
-      await this.cacheService.get<{ data: Flight[]; errors: any[] }>(cacheKey);
+    const cached = await this.cacheService.get<{
+      data: Flight[];
+      errors: any[];
+    }>(cacheKey);
     if (cached) {
       this.logger.log(`Cache HIT — key: ${cacheKey}`);
       return cached;
