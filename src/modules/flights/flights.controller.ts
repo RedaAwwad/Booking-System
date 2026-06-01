@@ -1,7 +1,8 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FlightsService } from './flights.service';
 import { FlightsSearchDto } from './dto/flights-search.dto';
+import { CreateFlightBookingDto } from './dto/create-flight-booking.dto';
 
 @ApiTags('flights')
 @Controller('flights')
@@ -20,5 +21,15 @@ export class FlightsController {
   })
   search(@Query() query: FlightsSearchDto) {
     return this.flightsService.search(query);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new flight booking' })
+  @ApiResponse({
+    status: 201,
+    description: 'Returns the initiated booking transaction.',
+  })
+  createBooking(@Body() dto: CreateFlightBookingDto) {
+    return this.flightsService.createBooking(dto);
   }
 }

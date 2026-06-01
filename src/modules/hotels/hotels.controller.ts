@@ -1,6 +1,7 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HotelsSearchDto } from './dto/hotels-search.dto';
+import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
 import { HotelsService } from './hotels.service';
 
 @ApiTags('hotels')
@@ -20,5 +21,15 @@ export class HotelsController {
   })
   search(@Query() query: HotelsSearchDto) {
     return this.hotelsService.search(query);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new hotel booking' })
+  @ApiResponse({
+    status: 201,
+    description: 'Returns the initiated booking transaction.',
+  })
+  createBooking(@Body() dto: CreateHotelBookingDto) {
+    return this.hotelsService.createBooking(dto);
   }
 }
