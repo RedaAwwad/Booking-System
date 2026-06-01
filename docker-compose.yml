@@ -21,7 +21,7 @@ services:
     container_name: booking_postgres
     restart: unless-stopped
     ports:
-      - "${DATABASE_LOCAL_PORT:-5432}:5432"
+      - "${DATABASE_LOCAL_PORT:-5434}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     environment:
