@@ -24,47 +24,48 @@ export class FlightsService {
   }
 
   async createBooking(dto: CreateFlightBookingDto): Promise<any> {
-    return this.dataSource.transaction(async (em) => {
-      // 1. Create PENDING Transaction
-      const transaction =
-        await this.transactionsService.createWithEntityManager(em, {
-          userId: dto.userId,
-          amount: dto.totalPrice,
-          currency: dto.currency,
-          paymentMethod: dto.paymentMethod,
-        });
+    return dto;
+    // return this.dataSource.transaction(async (em) => {
+    //   // 1. Create PENDING Transaction
+    //   const transaction =
+    //     await this.transactionsService.createWithEntityManager(em, {
+    //       userId: dto.userId,
+    //       amount: dto.totalPrice,
+    //       currency: dto.currency,
+    //       paymentMethod: dto.paymentMethod,
+    //     });
 
-      // 2. Create Flight Booking
-      const flightBooking = em.create(FlightBooking, {
-        transactionId: transaction.id,
-        origin: dto.origin,
-        destination: dto.destination,
-        departureDate: dto.departureDate,
-        cabinClass: dto.cabinClass,
-        adultsCount: dto.adultsCount,
-        totalPrice: dto.totalPrice,
-        currency: dto.currency || 'USD',
-      });
-      await em.save(FlightBooking, flightBooking);
+    //   // 2. Create Flight Booking
+    //   const flightBooking = em.create(FlightBooking, {
+    //     transactionId: transaction.id,
+    //     origin: dto.origin,
+    //     destination: dto.destination,
+    //     departureDate: dto.departureDate,
+    //     cabinClass: dto.cabinClass,
+    //     adultsCount: dto.adultsCount,
+    //     totalPrice: dto.totalPrice,
+    //     currency: dto.currency || 'USD',
+    //   });
+    //   await em.save(FlightBooking, flightBooking);
 
-      // 3. Write Outbox Event
-      await this.outboxService.writeEvent(em, {
-        exchangeName: 'booking.notifications',
-        routingKey: 'email.notifications',
-        payload: {
-          transactionId: transaction.id,
-          type: 'EMAIL',
-          recipient: dto.userEmail,
-          subject: `Flight booking confirmation (${dto.origin} → ${dto.destination})`,
-          content: 'Your flight booking is confirmed. Details...',
-        },
-      });
+    //   // 3. Write Outbox Event
+    //   await this.outboxService.writeEvent(em, {
+    //     exchangeName: 'booking.notifications',
+    //     routingKey: 'email.notifications',
+    //     payload: {
+    //       transactionId: transaction.id,
+    //       type: 'EMAIL',
+    //       recipient: dto.userEmail,
+    //       subject: `Flight booking confirmation (${dto.origin} → ${dto.destination})`,
+    //       content: 'Your flight booking is confirmed. Details...',
+    //     },
+    //   });
 
-      return {
-        message: 'Flight booking initiated',
-        transactionId: transaction.id,
-        bookingId: flightBooking.id,
-      };
-    });
+    //   return {
+    //     message: 'Flight booking initiated',
+    //     transactionId: transaction.id,
+    //     bookingId: flightBooking.id,
+    //   };
+    // });
   }
 }
