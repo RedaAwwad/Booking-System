@@ -1,13 +1,11 @@
-name: booking-system
+name: booking-system-prod
 
 services:
   redis:
     image: redis:8.6-alpine
-    container_name: booking_redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    container_name: booking_redis_prod
     volumes:
-      - redis_data:/data
+      - redis_data_prod:/data
     command: ["redis-server", "--appendonly", "yes"]
     restart: unless-stopped
     healthcheck:
@@ -18,12 +16,10 @@ services:
 
   postgres:
     image: postgres:18.4-alpine
-    container_name: booking_postgres
+    container_name: booking_postgres_prod
     restart: unless-stopped
-    ports:
-      - "${DATABASE_LOCAL_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data_prod:/var/lib/postgresql
     environment:
       POSTGRES_DB: ${DATABASE_NAME}
       POSTGRES_USER: ${DATABASE_USER}
@@ -37,16 +33,13 @@ services:
 
   rabbitmq:
     image: rabbitmq:4.3.1-management-alpine
-    container_name: booking_rabbitmq
+    container_name: booking_rabbitmq_prod
     restart: unless-stopped
-    ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_data_prod:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -54,13 +47,10 @@ services:
       retries: 5
 
   node-app:
-    container_name: booking-api
+    container_name: booking-api-prod
     build:
       context: .
-      target: development
-    profiles: [fullstack]
-    volumes:
-      - ./src:/app/src
+      target: production
     ports:
       - "${PORT:-3000}:3000"
     env_file:
@@ -82,6 +72,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  redis_data:
-  postgres_data:
-  rabbitmq_data:
+  redis_data_prod:
+  postgres_data_prod:
+  rabbitmq_data_prod:

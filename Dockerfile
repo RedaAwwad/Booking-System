@@ -1,21 +1,52 @@
-# Development image for the NestJS Booking System API.
-# Small Alpine base, cached dependency layer, runs as non-root.
-
-FROM node:20-alpine
+# ── Stage 1: Base ────────────────────────────────────────────────────────────
+# Shared foundation for all stages. Keeps the base image consistent.
+FROM node:24.15.0-alpine AS base
 
 WORKDIR /app
 
-# Install only what package.json declares; copy lockfile first for layer caching.
+# ── Stage 2: Development ──────────────────────────────────────────────────────
+# Runs as root — fine for a local dev environment behind Docker Desktop.
+# Avoids all permission complexity (no chown, no USER switching needed).
+# Used by docker-compose.yml via build.target: development.
+FROM base AS development
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy the rest of the source (src is bind-mounted in compose for hot reload).
+# Source is bind-mounted from the host in compose for hot reload,
+# but we still COPY here so the image is self-contained if run standalone.
 COPY . .
 
-# Drop privileges: official node image ships a non-root "node" user (uid 1000).
-USER node
-
-# Must match PORT in .env (defaults to 3000 in this project).
 EXPOSE 3000
 
 CMD ["npm", "run", "dev"]
+
+# ── Stage 3: Builder ──────────────────────────────────────────────────────────
+# Throwaway intermediate stage. Compiles TypeScript → dist/.
+# Runs as root — this image is never deployed or exposed.
+FROM base AS builder
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+RUN npm run build
+
+# ── Stage 4: Production ───────────────────────────────────────────────────────
+# Lean final image: only compiled JS and production dependencies.
+# This is the only stage that gets deployed, so this is where we drop privileges.
+FROM base AS production
+
+COPY --chown=node:node package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# Pull the compiled output from the builder stage.
+COPY --chown=node:node --from=builder /app/dist ./dist
+
+# Drop to non-root right before running the app — the only place it matters.
+USER node
+
+EXPOSE 3000
+
+CMD ["node", "dist/main"]
