@@ -26,12 +26,13 @@ export class FlightsService {
   async createBooking(dto: CreateFlightBookingDto): Promise<any> {
     return this.dataSource.transaction(async (em) => {
       // 1. Create PENDING Transaction
-      const transaction = await this.transactionsService.createWithEntityManager(em, {
-        userId: dto.userId,
-        amount: dto.totalPrice,
-        currency: dto.currency,
-        paymentMethod: dto.paymentMethod,
-      });
+      const transaction =
+        await this.transactionsService.createWithEntityManager(em, {
+          userId: dto.userId,
+          amount: dto.totalPrice,
+          currency: dto.currency,
+          paymentMethod: dto.paymentMethod,
+        });
 
       // 2. Create Flight Booking
       const flightBooking = em.create(FlightBooking, {

@@ -1,52 +1,13 @@
 name: booking-system
 
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: booking_redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    command: ["redis-server", "--appendonly", "yes"]
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:16
-    container_name: booking_postgres
-    restart: unless-stopped
-    ports:
-      - "${DATABASE_LOCAL_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: ${DATABASE_NAME}
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-    entrypoint: >
-      bash -c "apt-get update && apt-get install -y postgresql-16-cron && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=$${POSTGRES_DB} -c max_connections=200"
-
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    container_name: booking_rabbitmq
-    restart: unless-stopped
-    ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-
   node-app:
     container_name: booking-api
     build: .
-    profiles: [fullstack]
     volumes:
       - ./src:/app/src
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"
+      - '${PORT:-3000}:${PORT:-3000}'
     env_file:
       - .env
     environment:
@@ -56,11 +17,57 @@ services:
       REDIS_PORT: 6379
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
     depends_on:
-      - redis
-      - postgres
-      - rabbitmq
-    command: ["npm", "run", "dev"]
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy # wait until DB is ready
+      rabbitmq:
+        condition: service_started
+    command: ['npm', 'run', 'dev']
     restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: booking_redis
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    command: ['redis-server', '--appendonly', 'yes']
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    container_name: booking_postgres
+    restart: unless-stopped
+    ports:
+      - '${DATABASE_LOCAL_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    entrypoint: >
+      bash -c "apt-get update && apt-get install -y postgresql-16-cron && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=$${POSTGRES_DB} -c max_connections=200"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: booking_rabbitmq
+    restart: unless-stopped
+    ports:
+      - '${RABBITMQ_PORT:-5672}:5672'
+      - '${RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
 
 volumes:
   redis_data:

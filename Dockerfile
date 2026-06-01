@@ -12,6 +12,10 @@ RUN npm ci
 # Copy the rest of the source (src is bind-mounted in compose for hot reload).
 COPY . .
 
+# Ensure the non-root `node` user can write build artifacts (e.g. /app/dist)
+# Create the dist directory and set ownership before switching user.
+RUN mkdir -p /app/dist && chown -R node:node /app
+
 # Drop privileges: official node image ships a non-root "node" user (uid 1000).
 USER node
 
