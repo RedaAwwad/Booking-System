@@ -1,0 +1,18 @@
+FROM postgres:18
+
+# Install build tools natively available in Debian
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    postgresql-server-dev-18 \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone and install pg_cron effortlessly
+RUN git clone https://github.com/citusdata/pg_cron.git \
+    && cd pg_cron \
+    && make && make install \
+    && cd .. && rm -rf pg_cron
+
+# Copy your initialization script
+COPY ./init-pgcron.sql /docker-entrypoint-initdb.d/

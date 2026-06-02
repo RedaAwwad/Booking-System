@@ -17,8 +17,12 @@ services:
       retries: 5
 
   postgres:
-    image: postgres:18.4-alpine
-    container_name: booking_postgres
+    # 1. Replace the 'image:' line with this build block
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+      
+    container_name: booking_postgres # (Use booking_postgres_prod for the prod file)
     restart: unless-stopped
     ports:
       - "${DATABASE_LOCAL_PORT:-5434}:5432"
@@ -28,7 +32,14 @@ services:
       POSTGRES_DB: ${DATABASE_NAME}
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-    command: postgres -c 'max_connections=200'
+      
+    # 2. Update the command to preload the library and set the cron database
+    command: >
+      postgres 
+      -c "max_connections=200" 
+      -c "shared_preload_libraries=pg_cron" 
+      -c "cron.database_name=${DATABASE_NAME}"
+      
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
