@@ -67,6 +67,8 @@ services:
       - .env
     environment:
       PORT: ${PORT:-3000}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
       DATABASE_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379

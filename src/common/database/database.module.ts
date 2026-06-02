@@ -2,7 +2,7 @@ import { Global, Module, OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
-
+ 
 @Global()
 @Module({
   imports: [
@@ -11,7 +11,7 @@ import { DataSource } from 'typeorm';
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         host: configService.get<string>('DATABASE_HOST', 'localhost'),
-        port: configService.get<number>('DATABASE_PORT', 5432),
+        port: configService.get<number>('DATABASE_PORT', 5434),
         username: configService.get<string>('DATABASE_USER', 'booking'),
         password: configService.get<string>('DATABASE_PASSWORD', 'booking'),
         database: configService.get<string>('DATABASE_NAME', 'booking'),
