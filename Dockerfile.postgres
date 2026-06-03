@@ -1,4 +1,4 @@
-FROM postgres:18
+FROM postgres:18.4
 
 # Install build tools natively available in Debian
 RUN apt-get update && apt-get install -y --no-install-recommends \
