@@ -5,13 +5,9 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { TransactionStatus } from '../contracts/transaction-status';
 
-export enum TransactionStatus {
-  PENDING = 'PENDING',
-  PAID = 'PAID',
-  FAILED = 'FAILED',
-  REFUNDED = 'REFUNDED',
-}
+export { TransactionStatus };
 
 @Entity('transactions')
 export class Transaction {

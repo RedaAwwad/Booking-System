@@ -6,10 +6,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Connection, Consumer } from 'rabbitmq-client';
-import { EmailService } from '../email/email.service';
-import { SmsService } from '../sms/sms.service';
+import { NotificationsDeliveryService } from '../notifications-delivery.service';
 import { TransactionsService } from '../../transactions/transactions.service';
-import { TransactionStatus } from '../../transactions/entities/transaction.entity';
+import { TransactionStatus } from '../../transactions/contracts';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -27,9 +26,8 @@ export class NotificationWorkerService
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly emailService: EmailService,
-    private readonly smsService: SmsService,
-    private readonly transactionsService: TransactionsService,
+    private readonly notificationsDelivery: NotificationsDeliveryService,
+    private readonly transactions: TransactionsService,
     @InjectRepository(Notification)
     private readonly notificationRepo: Repository<Notification>,
   ) {}
@@ -86,13 +84,16 @@ export class NotificationWorkerService
 
     try {
       if (payload.type === 'EMAIL') {
-        await this.emailService.send(
+        await this.notificationsDelivery.sendEmail(
           payload.recipient,
           payload.subject,
           payload.content,
         );
       } else if (payload.type === 'SMS') {
-        await this.smsService.send(payload.recipient, payload.content);
+        await this.notificationsDelivery.sendSms(
+          payload.recipient,
+          payload.content,
+        );
       } else {
         throw new Error(`Unknown notification type: ${payload.type}`);
       }
@@ -102,7 +103,7 @@ export class NotificationWorkerService
       await this.notificationRepo.save(notification);
 
       if (payload.transactionId) {
-        await this.transactionsService.updateStatus(
+        await this.transactions.updateStatus(
           payload.transactionId,
           TransactionStatus.PAID,
         );
@@ -113,7 +114,7 @@ export class NotificationWorkerService
       await this.notificationRepo.save(notification);
 
       if (payload.transactionId) {
-        await this.transactionsService.updateStatus(
+        await this.transactions.updateStatus(
           payload.transactionId,
           TransactionStatus.FAILED,
         );

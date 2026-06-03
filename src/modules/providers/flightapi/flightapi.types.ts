@@ -1,6 +1,7 @@
 export interface FlightapiError {
-  response: {
+  response?: {
     status: number;
+    data?: unknown;
   };
 }
 

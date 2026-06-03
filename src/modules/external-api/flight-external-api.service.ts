@@ -1,10 +1,17 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
-import { IFlightProvider } from '../providers/interfaces/flight-provider.interface';
-import { Flight } from '../flights/flights.types';
-import { FlightsSearchDto } from '../flights/dto/flights-search.dto';
+import {
+  IFlightProvider,
+  FLIGHT_PROVIDERS,
+  Flight,
+  FlightsSearchDto,
+} from '../flights/contracts';
 import { ConfigService } from '@nestjs/config';
-import { CacheServiceImpl } from '../../common/cache/cache.service';
+import { CACHE_SERVICE } from '../../common/cache/cache.interface';
+import type { ICacheService } from '../../common/cache/cache.interface';
 import { buildCacheKey } from '../../common/cache/cache-key.util';
+
+/** Duffel offerRequests.create often needs 15–25s+ before offers are returned. */
+const MIN_SCATTER_GATHER_TIMEOUT_MS = 45_000;
 
 @Injectable()
 export class FlightExternalApiService {
@@ -13,12 +20,28 @@ export class FlightExternalApiService {
 
   constructor(
     private readonly configService: ConfigService,
-    @Inject('FLIGHT_PROVIDERS') private readonly providers: IFlightProvider[],
-    private readonly cacheService: CacheServiceImpl,
+    @Inject(FLIGHT_PROVIDERS) private readonly providers: IFlightProvider[],
+    @Inject(CACHE_SERVICE) private readonly cacheService: ICacheService,
   ) {
     this.logger = new Logger(FlightExternalApiService.name);
-    const timeout = this.configService.get<string>('SCATTER_GATHER_TIMEOUT');
-    this.timeoutInMilliseconds = Number(timeout);
+    const raw = this.configService.get<string>('SCATTER_GATHER_TIMEOUT');
+    const parsed = Number(raw);
+    let timeout =
+      Number.isFinite(parsed) && parsed > 0
+        ? parsed
+        : MIN_SCATTER_GATHER_TIMEOUT_MS;
+
+    if (timeout < MIN_SCATTER_GATHER_TIMEOUT_MS) {
+      this.logger.warn(
+        `SCATTER_GATHER_TIMEOUT=${timeout}ms is too low for Duffel; using ${MIN_SCATTER_GATHER_TIMEOUT_MS}ms`,
+      );
+      timeout = MIN_SCATTER_GATHER_TIMEOUT_MS;
+    }
+
+    this.timeoutInMilliseconds = timeout;
+    this.logger.log(
+      `Scatter-gather timeout: ${this.timeoutInMilliseconds}ms`,
+    );
   }
 
   async handle(

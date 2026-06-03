@@ -4,6 +4,7 @@ import { FlightsController } from './flights.controller';
 import { FlightsService } from './flights.service';
 import { ExternalApiModule } from '../external-api/external-api.module';
 import { TransactionsModule } from '../transactions/transactions.module';
+import { OutboxModule } from '../outbox/outbox.module';
 import { FlightBooking } from './entities/flight-booking.entity';
 
 @Module({
@@ -11,6 +12,7 @@ import { FlightBooking } from './entities/flight-booking.entity';
     ExternalApiModule,
     TypeOrmModule.forFeature([FlightBooking]),
     TransactionsModule,
+    OutboxModule,
   ],
   controllers: [FlightsController],
   providers: [FlightsService],

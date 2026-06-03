@@ -1,29 +1,31 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
-import { Transaction, TransactionStatus } from './entities/transaction.entity';
+import {
+  CreateTransactionInput,
+  ITransactionsService,
+  TransactionRef,
+  TransactionStatus,
+} from './contracts/transactions.interface';
+import { Transaction } from './entities/transaction.entity';
 
 @Injectable()
-export class TransactionsService {
+export class TransactionsService implements ITransactionsService {
   constructor(
     @InjectRepository(Transaction)
     private readonly transactionRepository: Repository<Transaction>,
   ) {}
 
-  createWithEntityManager(
+  async createInTransaction(
     em: EntityManager,
-    input: {
-      userId: string;
-      amount: number;
-      currency?: string;
-      paymentMethod: string;
-    },
-  ): Promise<Transaction> {
+    input: CreateTransactionInput,
+  ): Promise<TransactionRef> {
     const transaction = em.create(Transaction, {
       ...input,
       status: TransactionStatus.PENDING,
     });
-    return em.save(Transaction, transaction);
+    const saved = await em.save(Transaction, transaction);
+    return { id: saved.id };
   }
 
   async updateStatus(id: string, status: TransactionStatus): Promise<void> {

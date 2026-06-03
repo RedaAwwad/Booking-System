@@ -1,40 +1,37 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { FlightExternalApiService } from '../external-api/flight-external-api.service';
 import { FlightsSearchDto } from './dto/flights-search.dto';
 import { CreateFlightBookingDto } from './dto/create-flight-booking.dto';
 import { Flight } from './flights.types';
 import { TransactionsService } from '../transactions/transactions.service';
 import { OutboxService } from '../outbox/outbox.service';
+import { FlightSearchService } from '../external-api/flight-search.service';
 import { FlightBooking } from './entities/flight-booking.entity';
 
 @Injectable()
 export class FlightsService {
   constructor(
-    private readonly externalApiService: FlightExternalApiService,
+    private readonly flightSearch: FlightSearchService,
     private readonly dataSource: DataSource,
-    private readonly transactionsService: TransactionsService,
-    private readonly outboxService: OutboxService,
+    private readonly transactions: TransactionsService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async search(
     query: FlightsSearchDto,
   ): Promise<{ data: Flight[]; errors: string[] }> {
-    return await this.externalApiService.handle(query);
+    return await this.flightSearch.search(query);
   }
 
   async createBooking(dto: CreateFlightBookingDto): Promise<any> {
     return this.dataSource.transaction(async (em) => {
-      // 1. Create PENDING Transaction
-      const transaction =
-        await this.transactionsService.createWithEntityManager(em, {
-          userId: dto.userId,
-          amount: dto.totalPrice,
-          currency: dto.currency,
-          paymentMethod: dto.paymentMethod,
-        });
+      const transaction = await this.transactions.createInTransaction(em, {
+        userId: dto.userId,
+        amount: dto.totalPrice,
+        currency: dto.currency,
+        paymentMethod: dto.paymentMethod,
+      });
 
-      // 2. Create Flight Booking
       const flightBooking = em.create(FlightBooking, {
         transactionId: transaction.id,
         origin: dto.origin,
@@ -47,8 +44,7 @@ export class FlightsService {
       });
       await em.save(FlightBooking, flightBooking);
 
-      // 3. Write Outbox Event
-      await this.outboxService.writeEvent(em, {
+      await this.outbox.writeEvent(em, {
         exchangeName: 'booking.notifications',
         routingKey: 'email.notifications',
         payload: {
