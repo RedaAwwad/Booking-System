@@ -53,9 +53,14 @@ export interface DuffelFlightOffer {
 ```
 
 **Why not import the SDK's types directly?**
-The SDK's `Offer` type is very large (hundreds of fields) and some of its required fields (like `available_services`) are not needed for our use case. Our local type captures only the fields we actually map to the internal `Flight` interface. This makes the code easier to understand and the mapping explicit.
+The SDK's `Offer` type is very large (hundreds of fields) and some of its required fields (like `available_services`) are not needed for our use case. Our local type captures only the fields we actually map to the internal `Flight` interface.
 
-**Trade-off:** If Duffel changes field names, the SDK types would reflect that change — but our local type would not. This is documented as a type safety gap (see the main README).
+**Trade-off / Preferred approach:** Maintaining a hand-written local type creates a drift risk — if Duffel renames a field, the SDK's types update but our local type stays broken silently. The better solution (documented in the main README's type safety section) is to use `Pick` from the SDK:
+```typescript
+import type { Offer } from '@duffel/api';
+type DuffelFlightOffer = Pick<Offer, 'id' | 'total_amount' | 'total_currency' | 'owner' | 'slices'>;
+```
+This gives us a minimal type that is still **derived from the SDK** — so TypeScript catches any breaking API changes immediately.
 
 ## Environment Variables
 
@@ -67,4 +72,33 @@ The SDK's `Offer` type is very large (hundreds of fields) and some of its requir
 
 1. **`total_amount` is always a string in Duffel.** Airlines return prices as strings (e.g. `"123.45"`). Our `parseFloat()` converts it to a number.
 2. **The first slice's first segment is the "main" flight.** For display purposes, we always use `slices[0].segments[0]` for departure info and `slices[0].segments[last]` for arrival info. In a multi-segment (layover) journey, `segments[last]` gives the final landing.
-3. **`fare_brand_name` may not match our `CabinClass` enum.** Duffel returns airline-specific brand names like `"Economy Flex"` or `"Business Light"`, not clean enum values. This is a known type mismatch.
+3. **Correcting the Cabin Class field:**
+
+   | Layer | What the code does | What's actually correct |
+   |---|---|---|
+   | **Wrong field** | Reads `fare_brand_name` for cabin class | Cabin class lives at `segments[n].passengers[n].cabin_class` |
+   | **Wrong level** | `fare_brand_name` is on `OfferSlice` (a parent), not `OfferSliceSegment` | Our local type puts it on the segment, which doesn't match the SDK at all |
+   | **Wrong type** | Local type declares it as `CabinClass` | In the SDK it's `string | null` — an airline brand name like `"BA Euro Traveller"` |
+
+   **⚠️ Why `segments[0].passengers[0].cabin_class` won't compile right now:**
+   `formatFlightResponse` casts to `DuffelFlightOffer` — the **local hand-written type** in `duffel-flights.types.ts`. That local type declares `segments` with only 6 fields (`departing_at`, `arriving_at`, `flight_number`, `origin`, `destination`, `fare_brand_name`). `passengers` is simply not listed there. TypeScript refuses to access a property that the type doesn't declare — even if the real API response contains it at runtime.
+
+   **The fix requires two steps done in order:**
+
+   **Step 1 — Switch to `Pick<Offer, ...>` (unlocks the SDK's full type chain):**
+   ```typescript
+   // In duffel-flights.types.ts — delete the hand-written DuffelFlightOffer interface
+   // and replace with:
+   import type { Offer } from '@duffel/api';
+   export type DuffelFlightOffer = Pick<Offer, 'id' | 'total_amount' | 'total_currency' | 'owner' | 'slices'>;
+   ```
+   Now `slices` is `OfferSlice[]` (SDK type) → `segments` is `OfferSliceSegment[]` (SDK type) → `passengers` is `OfferSliceSegmentPassenger[]` (SDK type) → `cabin_class` is `CabinClass` (SDK enum — already correct).
+
+   **Step 2 — Use the correct field (only works after Step 1):**
+   ```typescript
+   // In formatFlightResponse, replace line 103:
+   cabinClass: flight.slices?.[0]?.segments?.[0]?.passengers?.[0]?.cabin_class,
+   // No cast needed — it's already typed as CabinClass by the SDK
+   ```
+
+   Step 2 alone will fail with "Property 'passengers' does not exist" because the local type doesn't know about it. Step 1 must come first.

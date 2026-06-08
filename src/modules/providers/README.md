@@ -234,7 +234,14 @@ const slices: any[] = [{ origin, destination, departure_date }];
 offer as unknown as DuffelFlightOffer
 ```
 - **Why `as unknown as`?** The SDK returns `Omit<Offer, 'available_services'>` from the `.create()` call. Our local `DuffelFlightOffer` interface is a **subset** of the full SDK `Offer` type. They are not assignment-compatible by TypeScript's structural typing, requiring the double cast.
-- **Correct approach:** Either use the SDK's `Offer` type directly in `formatFlightResponse`, or extract only the fields we need using `Pick<Offer, 'id' | 'total_amount' | 'total_currency' | 'owner' | 'slices'>`.
+- **Correct approach (preferred):** Delete `DuffelFlightOffer` from `duffel-flights.types.ts` entirely and replace it with a `Pick` from the SDK:
+  ```typescript
+  import type { Offer } from '@duffel/api';
+
+  // A named alias for the exact subset of Offer fields we actually use
+  type DuffelFlightOffer = Pick<Offer, 'id' | 'total_amount' | 'total_currency' | 'owner' | 'slices'>;
+  ```
+  This way the type comes directly from the SDK — if Duffel ever renames a field, TypeScript will immediately tell you where the code breaks instead of silently passing a cast. The `offer as unknown as DuffelFlightOffer` double-cast then becomes just `offer as DuffelFlightOffer` (a safer single downcast since `Pick<Offer, ...>` is a strict subset of `Offer`).
 
 #### 4. Generic `formatFlightResponse<T>(providerFlight: T)` (line 82)
 ```typescript
@@ -262,8 +269,25 @@ formatFlightResponse<T>(context: T): Flight {
 ```typescript
 cabinClass: leg?.segments?.[0]?.cabin_class as unknown as CabinClass,
 ```
-- **Why `as unknown as`?** `FlightapiLeg.segments[].cabin_class` is typed as `string`. Our internal `CabinClass` is an enum (`'economy' | 'business' | 'first'`). A `string` is not directly assignable to a string enum without a cast.
-- **Correct approach:** Use a mapper function: `private mapFlightapiCabinClass(raw: string): CabinClass | undefined` with a `switch/case` that returns `undefined` for unknown values.
+- **Why `as unknown as`?** `FlightapiLeg.segments[].cabin_class` is typed as `string` in our local types. Our internal `CabinClass` is an enum (`'economy' | 'business' | 'first'`). A plain `string` is not directly assignable to a string enum without a cast, because TypeScript cannot guarantee the string value is one of the valid enum members.
+- **Correct approach:** A private mapper function that normalises the raw string:
+  ```typescript
+  private mapFlightapiCabinClass(raw: string | undefined): CabinClass | undefined {
+    switch (raw?.toLowerCase()) {
+      case 'economy': return CabinClass.ECONOMY;
+      case 'business': return CabinClass.BUSINESS;
+      case 'first':    return CabinClass.FIRST;
+      default:         return undefined; // unknown value — cabinClass is optional in Flight
+    }
+  }
+  ```
+  Then the usage becomes:
+  ```typescript
+  cabinClass: this.mapFlightapiCabinClass(leg?.segments?.[0]?.cabin_class),
+  ```
+  The `default: undefined` is safe because `cabinClass` is declared as `cabinClass?: CabinClass` (optional) in the internal `Flight` interface — so returning `undefined` simply means "we don't know the cabin class" rather than crashing.
+
+> **Note — the parallel Duffel issue:** In the Duffel adapter, the code reads `fare_brand_name` from a segment and types it as `CabinClass`. However, looking at the actual SDK types, `fare_brand_name` does **not exist on `OfferSliceSegment`** — it exists on `OfferSlice` (one level up) and is `string | null`, not `CabinClass`. It contains airline brand names like `"BA Euro Traveller"` or `"Economy Basic"`. The correct SDK field for actual cabin class is `OfferSliceSegment.passengers[0].cabin_class`, which IS already typed as `CabinClass` in the SDK — no mapping needed at all. See the Duffel README for a full breakdown.
 
 ### `flight-external-api.service.ts` (External API Module — related)
 
