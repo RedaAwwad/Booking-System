@@ -5,6 +5,7 @@ import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
 import { Hotel } from './hotels.types';
 import { TransactionsService } from '../transactions/transactions.service';
 import { OutboxService } from '../outbox/outbox.service';
+import { createBookingEmail } from '../notifications/email/templates/booking.template';
 import { HotelBooking } from './entities/hotel-booking.entity';
 
 @Injectable()
@@ -41,6 +42,16 @@ export class HotelsService {
       });
       await em.save(HotelBooking, hotelBooking);
 
+      const bookingEmail = createBookingEmail({
+        bookingType: 'hotel',
+        bookingId: hotelBooking.id,
+        userName: dto.userEmail.split('@')[0],
+        totalPrice: dto.totalPrice,
+        currency: dto.currency || 'USD',
+        checkIn: dto.checkIn,
+        checkOut: dto.checkOut,
+      });
+
       await this.outbox.writeEvent(em, {
         exchangeName: 'booking.notifications',
         routingKey: 'email.notifications',
@@ -48,8 +59,9 @@ export class HotelsService {
           transactionId: transaction.id,
           type: 'EMAIL',
           recipient: dto.userEmail,
-          subject: `Hotel booking confirmation (Hotel ID: ${dto.hotelId})`,
-          content: 'Your hotel booking is confirmed. Details...',
+          subject: bookingEmail.subject,
+          text: bookingEmail.text,
+          html: bookingEmail.html,
         },
       });
 
