@@ -4,7 +4,7 @@ import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private transporter?: nodemailer.Transporter;
   private readonly logger = new Logger(EmailService.name);
 
   constructor(private readonly configService: ConfigService) {
@@ -23,14 +23,22 @@ export class EmailService {
     }
   }
 
-  async send(to: string, subject: string, text: string): Promise<void> {
+  async send(
+    to: string,
+    subject: string,
+    text: string,
+    html?: string,
+  ): Promise<void> {
     if (!this.transporter) {
       this.logger.log(`[EMAIL STUB] to=${to} subject="${subject}"`);
       return;
     }
 
-    const from = this.configService.get<string>('SMTP_FROM', 'no-reply@example.com');
-    await this.transporter.sendMail({ from, to, subject, text });
+    const from = this.configService.get<string>(
+      'SMTP_FROM',
+      'no-reply@example.com',
+    );
+    await this.transporter.sendMail({ from, to, subject, text, html });
     this.logger.log(`Email sent to ${to}`);
   }
 }

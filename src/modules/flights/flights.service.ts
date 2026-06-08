@@ -6,6 +6,7 @@ import { CreateFlightBookingDto } from './dto/create-flight-booking.dto';
 import { Flight } from './flights.types';
 import { TransactionsService } from '../transactions/transactions.service';
 import { OutboxService } from '../outbox/outbox.service';
+import { createBookingEmail } from '../notifications/email/templates/booking.template';
 import { FlightBooking } from './entities/flight-booking.entity';
 
 @Injectable()
@@ -47,7 +48,19 @@ export class FlightsService {
       });
       await em.save(FlightBooking, flightBooking);
 
-      // 3. Write Outbox Event
+      // 3. Prepare email using booking template and write Outbox Event
+      const userName = dto.userEmail ? dto.userEmail.split('@')[0] : 'Guest';
+      const bookingEmail = createBookingEmail({
+        bookingType: 'flight',
+        bookingId: transaction.id,
+        userName,
+        totalPrice: dto.totalPrice,
+        currency: dto.currency,
+        origin: dto.origin,
+        destination: dto.destination,
+        departureDate: dto.departureDate,
+      });
+
       await this.outboxService.writeEvent(em, {
         exchangeName: 'booking.notifications',
         routingKey: 'email.notifications',
@@ -55,8 +68,9 @@ export class FlightsService {
           transactionId: transaction.id,
           type: 'EMAIL',
           recipient: dto.userEmail,
-          subject: `Flight booking confirmation (${dto.origin} → ${dto.destination})`,
-          content: 'Your flight booking is confirmed. Details...',
+          subject: bookingEmail.subject,
+          text: bookingEmail.text,
+          html: bookingEmail.html,
         },
       });
 
