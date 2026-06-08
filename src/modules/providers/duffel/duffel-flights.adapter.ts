@@ -6,13 +6,15 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Duffel } from '@duffel/api';
-import { IFlightProvider } from '../interfaces/flight-provider.interface';
-import { FlightsSearchDto } from '../../flights/dto/flights-search.dto';
+import {
+  IFlightProvider,
+  FlightsSearchDto,
+} from '../../flights/contracts';
 import {
   DuffelFlightOffer,
   DuffelOfferRequestError,
 } from './duffel-flights.types';
-import { Flight } from 'src/modules/flights/flights.types';
+import { Flight } from '../../flights/contracts';
 
 @Injectable()
 export class DuffelFlightsAdapter implements IFlightProvider {
@@ -23,9 +25,10 @@ export class DuffelFlightsAdapter implements IFlightProvider {
   constructor(private readonly configService: ConfigService) {
     this.logger = new Logger(this.providerName);
     const token = this.configService.get<string>('DUFFEL_API_TOKEN');
-    this.duffel = new Duffel({
-      token: token ?? '',
-    });
+    if (!token) {
+      throw new Error('DUFFEL_API_TOKEN is not configured');
+    }
+    this.duffel = new Duffel({ token });
   }
 
   async searchFlights(query: FlightsSearchDto): Promise<Flight[]> {
@@ -56,7 +59,14 @@ export class DuffelFlightsAdapter implements IFlightProvider {
         return_offers: true,
       });
 
-      return duffelOffersResponse.data.offers.map((offer) =>
+      const maxResults = query.limit ?? 50;
+      const offers = duffelOffersResponse.data.offers.slice(0, maxResults);
+
+      this.logger.log(
+        `Duffel returned ${duffelOffersResponse.data.offers.length} offers, using ${offers.length}`,
+      );
+
+      return offers.map((offer) =>
         this.formatFlightResponse<DuffelFlightOffer>(
           offer as unknown as DuffelFlightOffer,
         ),
@@ -81,8 +91,6 @@ export class DuffelFlightsAdapter implements IFlightProvider {
 
   formatFlightResponse<T>(providerFlight: T): Flight {
     const flight = providerFlight as DuffelFlightOffer;
-
-    this.logger.warn('flight = > ', flight);
 
     return {
       id: flight.id,

@@ -8,10 +8,22 @@ import { DataSource } from 'typeorm';
   imports: [
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => {
+        const host = configService.get<string>('DATABASE_HOST', 'localhost');
+        const isLocalHost =
+          host === 'localhost' || host === '127.0.0.1' || host === '::1';
+        const port = isLocalHost
+          ? Number(
+              configService.get<string>('DATABASE_LOCAL_PORT') ??
+                configService.get<string>('DATABASE_PORT') ??
+                5432,
+            )
+          : Number(configService.get<string>('DATABASE_PORT') ?? 5432);
+
+        return {
         type: 'postgres',
-        host: configService.get<string>('DATABASE_HOST', 'localhost'),
-        port: configService.get<number>('DATABASE_PORT', 5432),
+        host,
+        port,
         username: configService.get<string>('DATABASE_USER', 'postgres'),
         password: configService.get<string>('DATABASE_PASSWORD', 'password'),
         database: configService.get<string>('DATABASE_NAME', 'booking_system'),
@@ -19,7 +31,8 @@ import { DataSource } from 'typeorm';
         entities: [__dirname + '../../**/*.entity{.ts,.js}'],
         autoLoadEntities: true,
         synchronize: true, // Auto-sync for dev environment
-      }),
+        };
+      },
     }),
   ],
 })

@@ -5,6 +5,7 @@ import { EmailService } from './email/email.service';
 import { SmsService } from './sms/sms.service';
 import { NotificationWorkerService } from './worker/notification-worker.service';
 import { NotificationsService } from './notifications.service';
+import { NotificationsDeliveryService } from './notifications-delivery.service';
 import { TransactionsModule } from '../transactions/transactions.module';
 
 @Module({
@@ -15,9 +16,10 @@ import { TransactionsModule } from '../transactions/transactions.module';
   providers: [
     EmailService,
     SmsService,
+    NotificationsDeliveryService,
     NotificationWorkerService,
     NotificationsService,
   ],
-  exports: [EmailService, SmsService, NotificationsService],
+  exports: [NotificationsDeliveryService],
 })
 export class NotificationsModule {}

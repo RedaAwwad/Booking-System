@@ -23,9 +23,8 @@ import { CACHE_SERVICE } from './cache.interface';
   ],
   providers: [
     CacheServiceImpl,
-    // Bind to the interface token so consumers can inject by ICacheService
     { provide: CACHE_SERVICE, useClass: CacheServiceImpl },
   ],
-  exports: [CacheServiceImpl, CACHE_SERVICE],
+  exports: [CACHE_SERVICE],
 })
 export class CacheModule {}

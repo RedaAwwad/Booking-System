@@ -7,8 +7,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { IFlightProvider } from '../interfaces/flight-provider.interface';
-import { FlightsSearchDto } from '../../flights/dto/flights-search.dto';
+import {
+  IFlightProvider,
+  FlightsSearchDto,
+  Flight,
+  CabinClass,
+} from '../../flights/contracts';
 import {
   FlightapiError,
   FlightapiResponse,
@@ -16,7 +20,6 @@ import {
   FlightapiLeg,
   FlightapiCarrier,
 } from './flightapi.types';
-import { Flight, CabinClass } from '../../flights/flights.types';
 
 @Injectable()
 export class FlightApiAdapter implements IFlightProvider {
@@ -62,10 +65,18 @@ export class FlightApiAdapter implements IFlightProvider {
         })
         .filter((f): f is Flight => f !== null);
     } catch (error) {
+      const apiError = error as FlightapiError;
+      const status = apiError.response?.status;
+      const detail =
+        typeof apiError.response?.data === 'string'
+          ? apiError.response.data
+          : JSON.stringify(apiError.response?.data ?? {});
+
       this.logger.error(
-        `${this.providerName} Error: ${(error as Error).message}`,
+        `${this.providerName} Error (${status ?? 'n/a'}): ${(error as Error).message} — ${detail}`,
       );
-      if ((error as FlightapiError).response?.status === 401) {
+
+      if (status === 401 || status === 403) {
         throw new UnauthorizedException(`Invalid ${this.providerName} key`);
       }
       throw new BadRequestException(
@@ -77,11 +88,28 @@ export class FlightApiAdapter implements IFlightProvider {
   private buildUrl(query: FlightsSearchDto): string {
     const adults = query.adults_count || 1;
     const children = query.children_count || 0;
-    const infants = 0; // Flightapi requires infants count
+    const infants = 0;
     const cabin = this.mapCabinClass(query.cabin_class);
     const currency = query.currency || 'USD';
+    const base = this.baseUrl.replace(/\/$/, '');
 
-    return `${this.baseUrl}/${this.apiKey}/${query.origin}/${query.destination}/${query.departure_date}/${adults}/${children}/${infants}/${cabin}/${currency}`;
+    if (query.return_date) {
+      const roundtripBase = base.includes('onewaytrip')
+        ? base.replace(/onewaytrip$/i, 'roundtrip')
+        : base.includes('roundtrip')
+          ? base
+          : `${base}/roundtrip`;
+
+      return `${roundtripBase}/${this.apiKey}/${query.origin}/${query.destination}/${query.departure_date}/${query.return_date}/${adults}/${children}/${infants}/${cabin}/${currency}`;
+    }
+
+    const onewayBase = base.includes('roundtrip')
+      ? base.replace(/roundtrip$/i, 'onewaytrip')
+      : base.includes('onewaytrip')
+        ? base
+        : `${base}/onewaytrip`;
+
+    return `${onewayBase}/${this.apiKey}/${query.origin}/${query.destination}/${query.departure_date}/${adults}/${children}/${infants}/${cabin}/${currency}`;
   }
 
   private mapCabinClass(cabin?: CabinClass): string {

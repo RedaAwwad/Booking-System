@@ -1,4 +1,4 @@
-import { CabinClass } from '../../flights/flights.types';
+import { CabinClass } from '../../flights/contracts';
 
 export interface DuffelOfferRequestError {
   errors: Array<{ message: string }>;
