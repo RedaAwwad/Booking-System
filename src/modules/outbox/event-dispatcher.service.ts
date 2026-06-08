@@ -2,7 +2,8 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { PublisherService } from './publisher.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { OutboxMessage } from './entities/outbox-message.entity';
+import { OutboxMessage, OutboxStatus } from './entities/outbox-message.entity';
+import { Client } from 'pg';
 
 @Injectable()
 export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
@@ -12,8 +13,6 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly dataSource: DataSource,
     private readonly publisherService: PublisherService,
-    @InjectRepository(OutboxMessage)
-    private readonly outboxRepo: Repository<OutboxMessage>,
   ) { }
 
   async onModuleInit() {
@@ -86,7 +85,9 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly dataSource: DataSource,
     private readonly publisherService: PublisherService,
-  ) {}
+    @InjectRepository(OutboxMessage)
+    private readonly outboxRepo: Repository<OutboxMessage>,
+  ) { }
 
   async onModuleInit() {
     this.logger.log('Initializing EventDispatcherService...');
@@ -121,7 +122,7 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
       // release the broken runner and re-run the full setup after a short delay
       pgClient.on('end', () => {
         this.logger.warn('pg connection ended unexpectedly. Reconnecting in 5s...');
-        this.queryRunner.release().catch(() => {});
+        this.queryRunner.release().catch(() => { });
         setTimeout(() => this.setupListener(), 5000);
       });
 
@@ -177,23 +178,23 @@ export class EventDispatcherService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  
+
   //  * Maps a raw database row (snake_case columns from pg_notify or raw SQL)
   //  * to a typed OutboxMessage entity (camelCase properties).
   //  *
   //  * Both pg_notify payloads (row_to_json) and dataSource.query() results
   //  * use database column names (snake_case). This helper is the single
   //  * conversion point — keeping format logic out of business logic.
-   
+
   private mapRawToEntity(raw: any): OutboxMessage {
     const entity = new OutboxMessage();
-    entity.id           = raw.id;
+    entity.id = raw.id;
     entity.exchangeName = raw.exchange_name;
-    entity.routingKey   = raw.routing_key;
-    entity.payload      = raw.payload;
-    entity.status       = raw.status;
-    entity.failedAt     = raw.failed_at ? new Date(raw.failed_at) : null;
-    entity.createdAt    = raw.created_at ? new Date(raw.created_at) : null;
+    entity.routingKey = raw.routing_key;
+    entity.payload = raw.payload;
+    entity.status = raw.status;
+    entity.failedAt = raw.failed_at;
+    entity.createdAt = raw.created_at;
     return entity;
   }
 
