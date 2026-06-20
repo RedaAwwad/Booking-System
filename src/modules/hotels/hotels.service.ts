@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { HotelsSearchDto } from './dto/hotels-search.dto';
 import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
@@ -6,6 +6,10 @@ import { Hotel } from './hotels.types';
 import { TransactionsService } from '../transactions/transactions.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { HotelBooking } from './entities/hotel-booking.entity';
+import { AUDIT_SERVICE } from '../audit/audit.interface';
+import type { IAuditService } from '../audit/audit.interface';
+import { AuditAction } from '../audit/audit-action.enum';
+
 
 @Injectable()
 export class HotelsService {
@@ -13,6 +17,7 @@ export class HotelsService {
     private readonly dataSource: DataSource,
     private readonly transactionsService: TransactionsService,
     private readonly outboxService: OutboxService,
+    @Inject(AUDIT_SERVICE) private readonly auditService: IAuditService,
   ) {}
 
   search(query: HotelsSearchDto): { data: Hotel[]; errors: [] } {
@@ -44,7 +49,15 @@ export class HotelsService {
       });
       await em.save(HotelBooking, hotelBooking);
 
-      // 3. Write Outbox Event
+      // 3. Write Audit Log
+      await this.auditService.writeLog(em, {
+        userId: dto.userId,
+        action: AuditAction.HOTEL_BOOKING_CREATED,
+        entityName: 'HotelBooking',
+        entityId: hotelBooking.id,
+      });
+
+      // 4. Write Outbox Event
       await this.outboxService.writeEvent(em, {
         exchangeName: 'booking.notifications',
         routingKey: 'email.notifications',

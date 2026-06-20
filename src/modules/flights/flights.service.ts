@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { FlightExternalApiService } from '../external-api/flight-external-api.service';
 import { FlightsSearchDto } from './dto/flights-search.dto';
@@ -7,6 +7,10 @@ import { Flight } from './flights.types';
 import { TransactionsService } from '../transactions/transactions.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { FlightBooking } from './entities/flight-booking.entity';
+import { AUDIT_SERVICE } from '../audit/audit.interface';
+import type { IAuditService } from '../audit/audit.interface';
+import { AuditAction } from '../audit/audit-action.enum';
+
 
 @Injectable()
 export class FlightsService {
@@ -15,6 +19,7 @@ export class FlightsService {
     private readonly dataSource: DataSource,
     private readonly transactionsService: TransactionsService,
     private readonly outboxService: OutboxService,
+    @Inject(AUDIT_SERVICE) private readonly auditService: IAuditService,
   ) {}
 
   async search(
@@ -47,7 +52,15 @@ export class FlightsService {
       });
       await em.save(FlightBooking, flightBooking);
 
-      // 3. Write Outbox Event
+      // 3. Write Audit Log
+      await this.auditService.writeLog(em, {
+        userId: dto.userId,
+        action: AuditAction.FLIGHT_BOOKING_CREATED,
+        entityName: 'FlightBooking',
+        entityId: flightBooking.id,
+      });
+
+      // 4. Write Outbox Event
       await this.outboxService.writeEvent(em, {
         exchangeName: 'booking.notifications',
         routingKey: 'email.notifications',

@@ -9,6 +9,7 @@ import { DatabaseModule } from './common/database/database.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { OutboxModule } from './modules/outbox/outbox.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     TransactionsModule,
     OutboxModule,
     NotificationsModule,
+    AuditModule,
     FlightsModule,
     HotelsModule,
   ],
