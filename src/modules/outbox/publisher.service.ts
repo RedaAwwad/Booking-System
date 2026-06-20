@@ -35,18 +35,12 @@ export class PublisherService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async publishRecord(record: any) {
-  // async publishRecord(record: OutboxMessage) {
+  async publishRecord(record: OutboxMessage) {
     try {
-      this.logger.log(`Publishing record [${record.id}] to exchange [${record.exchange_name || record.exchangeName}]`);
-      // this.logger.log(`Publishing record [${record.id}] to exchange [${record.exchangeName}]`);
-
-      const exchangeName = record.exchange_name || record.exchangeName;
-      const routingKey = record.routing_key || record.routingKey;
+      this.logger.log(`Publishing record [${record.id}] to exchange [${record.exchangeName}]`);
 
       await this.publisher.send(
-        { exchange: exchangeName, routingKey: routingKey },
-        // { exchange: record.exchangeName, routingKey: record.routingKey },
+        { exchange: record.exchangeName, routingKey: record.routingKey },
         record.payload,
       );
 

@@ -28,7 +28,7 @@ export class OutboxMessage {
   status: string;
 
   @Column({ type: 'timestamp', nullable: true, name: 'failed_at' })
-  failedAt: Date;
+  failedAt: Date | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

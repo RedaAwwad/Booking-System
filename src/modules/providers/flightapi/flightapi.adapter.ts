@@ -50,11 +50,7 @@ export class FlightApiAdapter implements IFlightProvider {
 
       return itineraries
         .map((itinerary) => {
-          return this.formatFlightResponse<{
-            itinerary: FlightapiItinerary;
-            legs: FlightapiLeg[];
-            carriers: FlightapiCarrier[];
-          }>({
+          return this.formatFlightResponse({
             itinerary,
             legs: data.legs || [],
             carriers: data.carriers || [],
@@ -96,12 +92,22 @@ export class FlightApiAdapter implements IFlightProvider {
     }
   }
 
-  formatFlightResponse<T>(context: T): Flight {
-    const { itinerary, legs, carriers } = context as unknown as {
-      itinerary: FlightapiItinerary;
-      legs: FlightapiLeg[];
-      carriers: FlightapiCarrier[];
-    };
+  private mapFlightapiCabinClass(raw: string | undefined): CabinClass | undefined {
+    switch (raw?.toLowerCase()) {
+      case 'economy':          return CabinClass.ECONOMY;
+      case 'premium_economy':  return CabinClass.PREMIUM_ECONOMY;
+      case 'business':         return CabinClass.BUSINESS;
+      case 'first':            return CabinClass.FIRST;
+      default:                 return undefined;
+    }
+  }
+
+  private formatFlightResponse(context: {
+    itinerary: FlightapiItinerary;
+    legs: FlightapiLeg[];
+    carriers: FlightapiCarrier[];
+  }): Flight {
+    const { itinerary, legs, carriers } = context;
 
     // Create maps for quick lookup
     const legsMap = new Map<string, FlightapiLeg>();
@@ -129,7 +135,7 @@ export class FlightApiAdapter implements IFlightProvider {
       arrivalTime: leg?.arrival_time ? new Date(leg?.arrival_time) : new Date(),
       price: itinerary.pricing_options?.[0]?.price?.amount || 0,
       currency: itinerary.pricing_options?.[0]?.price?.currency || 'USD',
-      cabinClass: leg?.segments?.[0]?.cabin_class as unknown as CabinClass,
+      cabinClass: this.mapFlightapiCabinClass(leg?.segments?.[0]?.cabin_class),
     };
   }
 }

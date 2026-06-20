@@ -12,7 +12,12 @@ import {
   DuffelFlightOffer,
   DuffelOfferRequestError,
 } from './duffel-flights.types';
-import { Flight } from 'src/modules/flights/flights.types';
+import { Flight, CabinClass } from 'src/modules/flights/flights.types';
+import type {
+  CreateOfferRequestPassenger,
+  CreateOfferRequestSlice,
+} from '@duffel/api/types';
+
 
 @Injectable()
 export class DuffelFlightsAdapter implements IFlightProvider {
@@ -30,15 +35,18 @@ export class DuffelFlightsAdapter implements IFlightProvider {
 
   async searchFlights(query: FlightsSearchDto): Promise<Flight[]> {
     try {
-      const passengers = Array.from({ length: query.adults_count }, () => ({
-        type: 'adult' as const,
-      })) as any[];
+      const passengers: CreateOfferRequestPassenger[] = Array.from(
+        { length: query.adults_count },
+        () => ({ type: 'adult' as const }),
+      );
 
-      const slices: any[] = [
+      const slices: CreateOfferRequestSlice[] = [
         {
           origin: query.origin,
           destination: query.destination,
           departure_date: query.departure_date,
+          arrival_time: null,
+          departure_time: null,
         },
       ];
 
@@ -47,6 +55,8 @@ export class DuffelFlightsAdapter implements IFlightProvider {
           origin: query.destination,
           destination: query.origin,
           departure_date: query.return_date,
+          arrival_time: null,
+          departure_time: null,
         });
       }
 
@@ -57,9 +67,7 @@ export class DuffelFlightsAdapter implements IFlightProvider {
       });
 
       return duffelOffersResponse.data.offers.map((offer) =>
-        this.formatFlightResponse<DuffelFlightOffer>(
-          offer as unknown as DuffelFlightOffer,
-        ),
+        this.formatFlightResponse(offer),
       );
     } catch (error) {
       if (
@@ -79,16 +87,26 @@ export class DuffelFlightsAdapter implements IFlightProvider {
     }
   }
 
-  formatFlightResponse<T>(providerFlight: T): Flight {
-    const flight = providerFlight as DuffelFlightOffer;
+  private mapDuffelCabinClass(raw: string | undefined): CabinClass | undefined {
+    switch (raw?.toLowerCase()) {
+      case 'economy':          return CabinClass.ECONOMY;
+      case 'premium_economy':  return CabinClass.PREMIUM_ECONOMY;
+      case 'business':         return CabinClass.BUSINESS;
+      case 'first':            return CabinClass.FIRST;
+      default:                 return undefined;
+    }
+  }
+
+  private formatFlightResponse(providerFlight: DuffelFlightOffer): Flight {
+    const flight = providerFlight;
 
     this.logger.warn('flight = > ', flight);
 
     return {
       id: flight.id,
       source: this.providerName,
-      airline: flight.owner?.name || flight.owner?.iata_code,
-      flightNumber: flight.slices?.[0]?.segments?.[0]?.flight_number || 'N/A',
+      airline: flight.owner?.name || flight.owner?.iata_code || 'N/A',
+      flightNumber: flight.slices?.[0]?.segments?.[0]?.operating_carrier_flight_number || 'N/A',
       departureAirport:
         flight.slices?.[0]?.segments?.[0]?.origin?.iata_code || 'N/A',
       arrivalAirport:
@@ -100,7 +118,9 @@ export class DuffelFlightsAdapter implements IFlightProvider {
       ),
       price: parseFloat(flight.total_amount),
       currency: flight.total_currency,
-      cabinClass: flight.slices?.[0]?.segments?.[0]?.fare_brand_name,
+      cabinClass: this.mapDuffelCabinClass(
+        flight.slices?.[0]?.segments?.[0]?.passengers?.[0]?.cabin_class,
+      ),
     };
   }
 }
