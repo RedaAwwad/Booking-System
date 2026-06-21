@@ -1,5 +1,7 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
+import { generateUUID } from '../../common/utils/uuid.util';
 import { FlightExternalApiService } from '../external-api/flight-external-api.service';
 import { FlightsSearchDto } from './dto/flights-search.dto';
 import { CreateFlightBookingDto } from './dto/create-flight-booking.dto';
@@ -7,19 +9,20 @@ import { Flight } from './flights.types';
 import { TransactionsService } from '../transactions/transactions.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { FlightBooking } from './entities/flight-booking.entity';
-import { AUDIT_SERVICE } from '../audit/audit.interface';
-import type { IAuditService } from '../audit/audit.interface';
 import { AuditAction } from '../audit/audit-action.enum';
-
+import {
+  AuditPayload,
+  NotificationPayload,
+} from '../outbox/types/outbox-payload.type';
 
 @Injectable()
 export class FlightsService {
   constructor(
+    private readonly configService: ConfigService,
     private readonly externalApiService: FlightExternalApiService,
     private readonly dataSource: DataSource,
     private readonly transactionsService: TransactionsService,
     private readonly outboxService: OutboxService,
-    @Inject(AUDIT_SERVICE) private readonly auditService: IAuditService,
   ) {}
 
   async search(
@@ -28,7 +31,16 @@ export class FlightsService {
     return await this.externalApiService.handle(query);
   }
 
-  async createBooking(dto: CreateFlightBookingDto): Promise<any> {
+  async createBooking(dto: CreateFlightBookingDto): Promise<{
+    message: string;
+    transactionId: string;
+    bookingId: string;
+  }> {
+    const notifExchange   = this.configService.getOrThrow<string>('NOTIFICATIONS_EXCHANGE');
+    const notifRoutingKey = this.configService.getOrThrow<string>('NOTIFICATIONS_ROUTING_KEY');
+    const auditExchange   = this.configService.getOrThrow<string>('AUDIT_EXCHANGE');
+    const auditRoutingKey = this.configService.getOrThrow<string>('AUDIT_ROUTING_KEY');
+
     return this.dataSource.transaction(async (em) => {
       // 1. Create PENDING Transaction
       const transaction =
@@ -52,25 +64,40 @@ export class FlightsService {
       });
       await em.save(FlightBooking, flightBooking);
 
-      // 3. Write Audit Log
-      await this.auditService.writeLog(em, {
-        userId: dto.userId,
-        action: AuditAction.FLIGHT_BOOKING_CREATED,
-        entityName: 'FlightBooking',
-        entityId: flightBooking.id,
-      });
-
-      // 4. Write Outbox Event
+      // 3. Write Notification Outbox Event
       await this.outboxService.writeEvent(em, {
-        exchangeName: 'booking.notifications',
-        routingKey: 'email.notifications',
+        exchangeName: notifExchange,
+        routingKey:   notifRoutingKey,
         payload: {
+          kind: 'notification',
           transactionId: transaction.id,
           type: 'EMAIL',
           recipient: dto.userEmail,
           subject: `Flight booking confirmation (${dto.origin} → ${dto.destination})`,
           content: 'Your flight booking is confirmed. Details...',
-        },
+        } satisfies NotificationPayload,
+      });
+
+      // 4. Write Audit Outbox Event
+      await this.outboxService.writeEvent(em, {
+        exchangeName: auditExchange,
+        routingKey:   auditRoutingKey,
+        payload: {
+          kind: 'audit',
+          eventType:    'booking.created',
+          entityType:   'FlightBooking',
+          entityId:     flightBooking.id,
+          action:       AuditAction.FLIGHT_BOOKING_CREATED,
+          performedBy:  dto.userId,
+          newValue: {
+            origin:      dto.origin,
+            destination: dto.destination,
+            totalPrice:  dto.totalPrice,
+            currency:    dto.currency,
+          },
+          correlationId: generateUUID(),
+          timestamp:     new Date().toISOString(),
+        } satisfies AuditPayload,
       });
 
       return {

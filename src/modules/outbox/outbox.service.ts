@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { OutboxMessage } from './entities/outbox-message.entity';
+import { OutboxPayload } from './types/outbox-payload.type';
 
 @Injectable()
 export class OutboxService {
@@ -9,10 +10,11 @@ export class OutboxService {
     input: {
       exchangeName: string;
       routingKey: string;
-      payload: any;
+      payload: OutboxPayload;
     },
   ): Promise<OutboxMessage> {
     const message = em.create(OutboxMessage, input);
     return em.save(OutboxMessage, message);
   }
 }
+

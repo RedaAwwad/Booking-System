@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
 } from 'typeorm';
+import type { OutboxPayload } from '../types/outbox-payload.type';
 
 export enum OutboxStatus {
   READY = 'READY',
@@ -22,7 +23,7 @@ export class OutboxMessage {
   routingKey: string;
 
   @Column({ type: 'jsonb' })
-  payload: any;
+  payload: OutboxPayload;
 
   @Column({ type: 'varchar', length: 50, default: OutboxStatus.READY })
   status: string;

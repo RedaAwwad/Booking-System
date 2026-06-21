@@ -1,15 +1,10 @@
-import { Module, Global } from '@nestjs/common';
-import { AuditService } from './audit.service';
-import { AUDIT_SERVICE } from './audit.interface';
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuditLog } from './entities/audit-log.entity';
+import { AuditConsumerService } from './audit-consumer.service';
 
-@Global()
 @Module({
-  providers: [
-    {
-      provide: AUDIT_SERVICE,
-      useClass: AuditService,
-    },
-  ],
-  exports: [AUDIT_SERVICE],
+  imports: [TypeOrmModule.forFeature([AuditLog])],
+  providers: [AuditConsumerService],
 })
 export class AuditModule {}

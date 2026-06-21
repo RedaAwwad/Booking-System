@@ -16,6 +16,7 @@ import {
   Notification,
   NotificationStatus,
 } from '../entities/notification.entity';
+import { NotificationPayload } from '../../outbox/types/outbox-payload.type';
 
 @Injectable()
 export class NotificationWorkerService
@@ -35,7 +36,11 @@ export class NotificationWorkerService
   ) {}
 
   onModuleInit() {
-    const url = this.configService.get<string>('RABBITMQ_URL');
+    const url        = this.configService.getOrThrow<string>('RABBITMQ_URL');
+    const exchange   = this.configService.getOrThrow<string>('NOTIFICATIONS_EXCHANGE');
+    const queue      = this.configService.getOrThrow<string>('NOTIFICATIONS_ROUTING_KEY');
+    const routingKey = this.configService.getOrThrow<string>('NOTIFICATIONS_ROUTING_KEY');
+
     this.connection = new Connection(url);
 
     this.connection.on('error', (err) => {
@@ -50,22 +55,18 @@ export class NotificationWorkerService
 
     this.consumer = this.connection.createConsumer(
       {
-        queue: 'email.notifications',
+        queue,
         queueOptions: { durable: true },
         qos: { prefetchCount: 10 },
-        exchanges: [{ exchange: 'booking.notifications', type: 'direct' }],
-        queueBindings: [
-          {
-            exchange: 'booking.notifications',
-            routingKey: 'email.notifications',
-          },
-        ],
+        exchanges: [{ exchange, type: 'direct' }],
+        queueBindings: [{ exchange, routingKey }],
       },
       async (msg) => {
+        const payload = msg.body as NotificationPayload;
         this.logger.log(
-          `Received notification task: ${JSON.stringify(msg.body)}`,
+          `Received notification task: ${JSON.stringify(payload)}`,
         );
-        await this.handleNotification(msg.body);
+        await this.handleNotification(payload);
       },
     );
 
@@ -74,7 +75,7 @@ export class NotificationWorkerService
     });
   }
 
-  private async handleNotification(payload: any) {
+  private async handleNotification(payload: NotificationPayload) {
     const notification = this.notificationRepo.create({
       transactionId: payload.transactionId,
       type: payload.type,
@@ -88,13 +89,13 @@ export class NotificationWorkerService
       if (payload.type === 'EMAIL') {
         await this.emailService.send(
           payload.recipient,
-          payload.subject,
+          payload.subject ?? '',
           payload.content,
         );
       } else if (payload.type === 'SMS') {
         await this.smsService.send(payload.recipient, payload.content);
       } else {
-        throw new Error(`Unknown notification type: ${payload.type}`);
+        throw new Error(`Unknown notification type: ${String(payload.type)}`);
       }
 
       notification.status = NotificationStatus.SENT;
@@ -109,7 +110,7 @@ export class NotificationWorkerService
       }
     } catch (e) {
       notification.status = NotificationStatus.FAILED;
-      notification.error = e.message;
+      notification.error = (e as Error).message;
       await this.notificationRepo.save(notification);
 
       if (payload.transactionId) {
