@@ -85,6 +85,17 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  nginx:
+    image: nginx:alpine
+    container_name: booking_nginx_prod
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - node-app
+    restart: unless-stopped
+
 volumes:
   redis_data_prod:
   postgres_data_prod:
