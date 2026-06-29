@@ -1,4 +1,4 @@
-import { Flight } from '../../flights/flights.types';
+import { Flight } from '../../flights/types/flights.types';
 import { FlightsSearchDto } from '../../flights/dto/flights-search.dto';
 
 export interface IFlightProvider {

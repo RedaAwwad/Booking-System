@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { IFlightProvider } from '../providers/interfaces/flight-provider.interface';
-import { Flight } from '../flights/flights.types';
+import { Flight } from '../flights/types/flights.types';
 import { FlightsSearchDto } from '../flights/dto/flights-search.dto';
 import { ConfigService } from '@nestjs/config';
 import { CacheServiceImpl } from '../../common/cache/cache.service';

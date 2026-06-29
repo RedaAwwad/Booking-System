@@ -12,7 +12,7 @@ import {
   DuffelFlightOffer,
   DuffelOfferRequestError,
 } from './duffel-flights.types';
-import { Flight, CabinClass } from 'src/modules/flights/flights.types';
+import { Flight, CabinClass } from 'src/modules/flights/types/flights.types';
 import type {
   CreateOfferRequestPassenger,
   CreateOfferRequestSlice,
@@ -89,11 +89,11 @@ export class DuffelFlightsAdapter implements IFlightProvider {
 
   private mapDuffelCabinClass(raw: string | undefined): CabinClass | undefined {
     switch (raw?.toLowerCase()) {
-      case 'economy':          return CabinClass.ECONOMY;
-      case 'premium_economy':  return CabinClass.PREMIUM_ECONOMY;
-      case 'business':         return CabinClass.BUSINESS;
-      case 'first':            return CabinClass.FIRST;
-      default:                 return undefined;
+      case 'economy': return CabinClass.ECONOMY;
+      case 'premium_economy': return CabinClass.PREMIUM_ECONOMY;
+      case 'business': return CabinClass.BUSINESS;
+      case 'first': return CabinClass.FIRST;
+      default: return undefined;
     }
   }
 

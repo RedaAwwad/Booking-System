@@ -10,7 +10,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { CabinClass } from '../flights.types';
+import { CabinClass } from '../types/flights.types';
 
 export class FlightsSearchDto {
   @ApiProperty({

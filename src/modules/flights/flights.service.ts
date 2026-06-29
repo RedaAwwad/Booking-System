@@ -5,7 +5,7 @@ import { generateUUID } from '../../common/utils/uuid.util';
 import { FlightExternalApiService } from '../external-api/flight-external-api.service';
 import { FlightsSearchDto } from './dto/flights-search.dto';
 import { CreateFlightBookingDto } from './dto/create-flight-booking.dto';
-import { Flight } from './flights.types';
+import { Flight } from './types/flights.types';
 import { TransactionsService } from '../transactions/transactions.service';
 import { FlightOutboxService } from './flight-outbox.service';
 import { FlightBooking } from './entities/flight-booking.entity';
@@ -19,7 +19,7 @@ export class FlightsService {
     private readonly dataSource: DataSource,
     private readonly transactionsService: TransactionsService,
     private readonly outboxService: FlightOutboxService,
-  ) {}
+  ) { }
 
   async search(
     query: FlightsSearchDto,

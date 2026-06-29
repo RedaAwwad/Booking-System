@@ -16,7 +16,7 @@ import {
   FlightapiLeg,
   FlightapiCarrier,
 } from './flightapi.types';
-import { Flight, CabinClass } from '../../flights/flights.types';
+import { Flight, CabinClass } from '../../flights/types/flights.types';
 
 @Injectable()
 export class FlightApiAdapter implements IFlightProvider {
@@ -94,11 +94,11 @@ export class FlightApiAdapter implements IFlightProvider {
 
   private mapFlightapiCabinClass(raw: string | undefined): CabinClass | undefined {
     switch (raw?.toLowerCase()) {
-      case 'economy':          return CabinClass.ECONOMY;
-      case 'premium_economy':  return CabinClass.PREMIUM_ECONOMY;
-      case 'business':         return CabinClass.BUSINESS;
-      case 'first':            return CabinClass.FIRST;
-      default:                 return undefined;
+      case 'economy': return CabinClass.ECONOMY;
+      case 'premium_economy': return CabinClass.PREMIUM_ECONOMY;
+      case 'business': return CabinClass.BUSINESS;
+      case 'first': return CabinClass.FIRST;
+      default: return undefined;
     }
   }
 
