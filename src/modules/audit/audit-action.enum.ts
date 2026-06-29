@@ -1,8 +1,10 @@
 export enum AuditAction {
   // ── Bookings ──────────────────────────────────────────────────────────────
   FLIGHT_BOOKING_CREATED  = 'FLIGHT_BOOKING_CREATED',
+  FLIGHT_BOOKING_UPDATED  = 'FLIGHT_BOOKING_UPDATED',
   FLIGHT_BOOKING_CANCELED = 'FLIGHT_BOOKING_CANCELED',
   HOTEL_BOOKING_CREATED   = 'HOTEL_BOOKING_CREATED',
+  HOTEL_BOOKING_UPDATED   = 'HOTEL_BOOKING_UPDATED',
   HOTEL_BOOKING_CANCELED  = 'HOTEL_BOOKING_CANCELED',
   // ── Transactions / Payment ────────────────────────────────────────────────
   TRANSACTION_CREATED      = 'TRANSACTION_CREATED',

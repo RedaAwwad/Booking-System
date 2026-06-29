@@ -1,23 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
-import { generateUUID } from '../../common/utils/uuid.util';
+import { ClsService } from 'nestjs-cls';
 import { HotelsSearchDto } from './dto/hotels-search.dto';
 import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
 import { Hotel } from './hotels.types';
 import { TransactionsService } from '../transactions/transactions.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { HotelBooking } from './entities/hotel-booking.entity';
-import { AuditAction } from '../audit/audit-action.enum';
-import {
-  AuditPayload,
-  NotificationPayload,
-} from '../outbox/types/outbox-payload.type';
+import { NotificationPayload } from '../outbox/types/outbox-payload.type';
+import type { ClsStore } from '../../common/cls/cls-store.interface';
 
 @Injectable()
 export class HotelsService {
   constructor(
     private readonly configService: ConfigService,
+    private readonly clsService: ClsService<ClsStore>,
     private readonly dataSource: DataSource,
     private readonly transactionsService: TransactionsService,
     private readonly outboxService: OutboxService,
@@ -34,10 +32,10 @@ export class HotelsService {
     transactionId: string;
     bookingId: string;
   }> {
+
+
     const notifExchange   = this.configService.getOrThrow<string>('NOTIFICATIONS_EXCHANGE');
     const notifRoutingKey = this.configService.getOrThrow<string>('NOTIFICATIONS_ROUTING_KEY');
-    const auditExchange   = this.configService.getOrThrow<string>('AUDIT_EXCHANGE');
-    const auditRoutingKey = this.configService.getOrThrow<string>('AUDIT_ROUTING_KEY');
 
     return this.dataSource.transaction(async (em) => {
       // 1. Create PENDING Transaction
@@ -49,6 +47,8 @@ export class HotelsService {
       });
 
       // 2. Create Hotel Booking
+      //    HotelBookingSubscriber.afterInsert() fires here automatically and
+      //    writes the audit outbox row — no manual audit call needed.
       const hotelBooking = em.create(HotelBooking, {
         transactionId: transaction.id,
         hotelId: dto.hotelId,
@@ -62,6 +62,8 @@ export class HotelsService {
       await em.save(HotelBooking, hotelBooking);
 
       // 3. Write Notification Outbox Event
+      //    Notifications are still explicit because they carry context (email, subject)
+      //    that is not stored on the entity and cannot be inferred by the subscriber.
       await this.outboxService.writeEvent(em, {
         exchangeName: notifExchange,
         routingKey:   notifRoutingKey,
@@ -73,29 +75,6 @@ export class HotelsService {
           subject: `Hotel booking confirmation (Hotel ID: ${dto.hotelId})`,
           content: 'Your hotel booking is confirmed. Details...',
         } satisfies NotificationPayload,
-      });
-
-      // 4. Write Audit Outbox Event
-      await this.outboxService.writeEvent(em, {
-        exchangeName: auditExchange,
-        routingKey:   auditRoutingKey,
-        payload: {
-          kind: 'audit',
-          eventType:    'booking.created',
-          entityType:   'HotelBooking',
-          entityId:     hotelBooking.id,
-          action:       AuditAction.HOTEL_BOOKING_CREATED,
-          performedBy:  dto.userId,
-          newValue: {
-            hotelId:    dto.hotelId,
-            checkIn:    dto.checkIn,
-            checkOut:   dto.checkOut,
-            totalPrice: dto.totalPrice,
-            currency:   dto.currency,
-          },
-          correlationId: generateUUID(),
-          timestamp:     new Date().toISOString(),
-        } satisfies AuditPayload,
       });
 
       return {
