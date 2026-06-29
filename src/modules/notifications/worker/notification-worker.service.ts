@@ -16,7 +16,7 @@ import {
   Notification,
   NotificationStatus,
 } from '../entities/notification.entity';
-import { NotificationPayload } from '../../outbox/types/outbox-payload.type';
+import { NotificationPayload } from '../types/notification-payload.type';
 
 @Injectable()
 export class NotificationWorkerService

@@ -34,27 +34,9 @@ export class DatabaseModule implements OnModuleInit {
       await this.dataSource.query(`CREATE EXTENSION IF NOT EXISTS pg_cron;`);
 
       // Attempt to schedule the pg_cron job for outbox relay
-      await this.dataSource.query(`
-        SELECT cron.schedule(
-          'outbox-relay',
-          '*/5 * * * *',
-          $$
-            DO $body$ DECLARE rec RECORD;
-            BEGIN
-              FOR rec IN SELECT * FROM outbox_messages WHERE status = 'READY' ORDER BY created_at ASC
-              LOOP
-                PERFORM pg_notify('outbox_channel', row_to_json(rec)::text);
-              END LOOP;
-            END; $body$;
-          $$
-        );
-      `);
-      console.log('Outbox relay pg_cron job scheduled.');
+      await this.dataSource.query(`SELECT cron.unschedule('outbox-relay');`).catch(() => {});
     } catch (e) {
-      console.warn(
-        'Could not initialize pg_cron or schedule the outbox relay.',
-        e.message,
-      );
+      console.warn('Could not initialize pg_cron.', e.message);
     }
   }
 }

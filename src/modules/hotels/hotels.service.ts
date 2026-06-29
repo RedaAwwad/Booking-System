@@ -6,9 +6,10 @@ import { HotelsSearchDto } from './dto/hotels-search.dto';
 import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
 import { Hotel } from './hotels.types';
 import { TransactionsService } from '../transactions/transactions.service';
-import { OutboxService } from '../outbox/outbox.service';
+import { HotelOutboxService } from './hotel-outbox.service';
+
 import { HotelBooking } from './entities/hotel-booking.entity';
-import { NotificationPayload } from '../outbox/types/outbox-payload.type';
+import { NotificationPayload } from '../notifications/types/notification-payload.type';
 import type { ClsStore } from '../../common/cls/cls-store.interface';
 
 @Injectable()
@@ -18,7 +19,7 @@ export class HotelsService {
     private readonly clsService: ClsService<ClsStore>,
     private readonly dataSource: DataSource,
     private readonly transactionsService: TransactionsService,
-    private readonly outboxService: OutboxService,
+    private readonly outboxService: HotelOutboxService,
   ) {}
 
   search(query: HotelsSearchDto): { data: Hotel[]; errors: [] } {
@@ -33,9 +34,6 @@ export class HotelsService {
     bookingId: string;
   }> {
 
-
-    const notifExchange   = this.configService.getOrThrow<string>('NOTIFICATIONS_EXCHANGE');
-    const notifRoutingKey = this.configService.getOrThrow<string>('NOTIFICATIONS_ROUTING_KEY');
 
     return this.dataSource.transaction(async (em) => {
       // 1. Create PENDING Transaction
@@ -65,17 +63,13 @@ export class HotelsService {
       //    Notifications are still explicit because they carry context (email, subject)
       //    that is not stored on the entity and cannot be inferred by the subscriber.
       await this.outboxService.writeEvent(em, {
-        exchangeName: notifExchange,
-        routingKey:   notifRoutingKey,
-        payload: {
-          kind: 'notification',
-          transactionId: transaction.id,
-          type: 'EMAIL',
-          recipient: dto.userEmail,
-          subject: `Hotel booking confirmation (Hotel ID: ${dto.hotelId})`,
-          content: 'Your hotel booking is confirmed. Details...',
-        } satisfies NotificationPayload,
-      });
+        kind: 'notification',
+        transactionId: transaction.id,
+        type: 'EMAIL',
+        recipient: dto.userEmail,
+        subject: `Hotel booking confirmation (Hotel ID: ${dto.hotelId})`,
+        content: 'Your hotel booking is confirmed. Details...',
+      } satisfies NotificationPayload);
 
       return {
         message: 'Hotel booking initiated',

@@ -3,9 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource, EntitySubscriberInterface, EventSubscriber, InsertEvent, UpdateEvent } from 'typeorm';
 import { ClsService } from 'nestjs-cls';
 import { HotelBooking } from '../entities/hotel-booking.entity';
-import { OutboxService } from '../../outbox/outbox.service';
+import { HotelOutboxService } from '../hotel-outbox.service';
 import { AuditAction } from '../../audit/audit-action.enum';
-import { AuditPayload } from '../../outbox/types/outbox-payload.type';
+import { AuditPayload } from '../../audit/types/audit-payload.type';
 import { generateUUID } from '../../../common/utils/uuid.util';
 import type { ClsStore } from '../../../common/cls/cls-store.interface';
 
@@ -19,7 +19,7 @@ export class HotelBookingSubscriber
   constructor(
     dataSource: DataSource,
     private readonly clsService: ClsService<ClsStore>,
-    private readonly outboxService: OutboxService,
+    private readonly outboxService: HotelOutboxService,
     private readonly configService: ConfigService,
   ) {
     // Register with TypeORM so it receives entity lifecycle events.
@@ -78,7 +78,7 @@ export class HotelBookingSubscriber
    * inside the same transaction as the triggering save/update.
    */
   private async writeAuditEvent(
-    em: Parameters<OutboxService['writeEvent']>[0],
+    em: Parameters<HotelOutboxService['writeEvent']>[0],
     opts: {
       action: AuditAction;
       eventType: string;
@@ -88,23 +88,20 @@ export class HotelBookingSubscriber
       newValue?: Record<string, unknown>;
     },
   ): Promise<void> {
-    const exchange   = this.configService.getOrThrow<string>('AUDIT_EXCHANGE');
-    const routingKey = this.configService.getOrThrow<string>('AUDIT_ROUTING_KEY');
-
     const payload: AuditPayload = {
-      kind:         'audit',
-      eventType:    opts.eventType,
-      entityType:   'HotelBooking',
-      entityId:     opts.entityId,
-      action:       opts.action,
-      performedBy:  opts.performedBy,
-      oldValue:     opts.oldValue,
-      newValue:     opts.newValue,
+      kind: 'audit',
+      eventType: opts.eventType,
+      entityType: 'HotelBooking',
+      entityId: opts.entityId,
+      action: opts.action,
+      performedBy: opts.performedBy,
+      oldValue: opts.oldValue as Record<string, unknown>,
+      newValue: opts.newValue as Record<string, unknown>,
       correlationId: generateUUID(),
-      timestamp:    new Date().toISOString(),
+      timestamp: new Date().toISOString(),
     };
 
-    await this.outboxService.writeEvent(em, { exchangeName: exchange, routingKey, payload });
+    await this.outboxService.writeEvent(em, payload);
   }
 
   /** Serialises a HotelBooking into a plain object safe for JSON storage. */

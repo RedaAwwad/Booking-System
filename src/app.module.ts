@@ -8,7 +8,6 @@ import { HotelsModule } from './modules/hotels/hotels.module';
 import { CacheModule } from './common/cache/cache.module';
 import { DatabaseModule } from './common/database/database.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
-import { OutboxModule } from './modules/outbox/outbox.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -31,7 +30,6 @@ import { CustomerModule } from './modules/customer/customer.module';
     DatabaseModule,
     CacheModule,
     TransactionsModule,
-    OutboxModule,
     NotificationsModule,
     AuditModule,
     FlightsModule,

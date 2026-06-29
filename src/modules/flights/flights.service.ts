@@ -7,13 +7,9 @@ import { FlightsSearchDto } from './dto/flights-search.dto';
 import { CreateFlightBookingDto } from './dto/create-flight-booking.dto';
 import { Flight } from './flights.types';
 import { TransactionsService } from '../transactions/transactions.service';
-import { OutboxService } from '../outbox/outbox.service';
+import { FlightOutboxService } from './flight-outbox.service';
 import { FlightBooking } from './entities/flight-booking.entity';
-import { AuditAction } from '../audit/audit-action.enum';
-import {
-  AuditPayload,
-  NotificationPayload,
-} from '../outbox/types/outbox-payload.type';
+import { NotificationPayload } from '../notifications/types/notification-payload.type';
 
 @Injectable()
 export class FlightsService {
@@ -22,7 +18,7 @@ export class FlightsService {
     private readonly externalApiService: FlightExternalApiService,
     private readonly dataSource: DataSource,
     private readonly transactionsService: TransactionsService,
-    private readonly outboxService: OutboxService,
+    private readonly outboxService: FlightOutboxService,
   ) {}
 
   async search(
@@ -36,11 +32,6 @@ export class FlightsService {
     transactionId: string;
     bookingId: string;
   }> {
-    const notifExchange   = this.configService.getOrThrow<string>('NOTIFICATIONS_EXCHANGE');
-    const notifRoutingKey = this.configService.getOrThrow<string>('NOTIFICATIONS_ROUTING_KEY');
-    const auditExchange   = this.configService.getOrThrow<string>('AUDIT_EXCHANGE');
-    const auditRoutingKey = this.configService.getOrThrow<string>('AUDIT_ROUTING_KEY');
-
     return this.dataSource.transaction(async (em) => {
       // 1. Create PENDING Transaction
       const transaction =
@@ -66,39 +57,13 @@ export class FlightsService {
 
       // 3. Write Notification Outbox Event
       await this.outboxService.writeEvent(em, {
-        exchangeName: notifExchange,
-        routingKey:   notifRoutingKey,
-        payload: {
-          kind: 'notification',
-          transactionId: transaction.id,
-          type: 'EMAIL',
-          recipient: dto.userEmail,
-          subject: `Flight booking confirmation (${dto.origin} → ${dto.destination})`,
-          content: 'Your flight booking is confirmed. Details...',
-        } satisfies NotificationPayload,
-      });
-
-      // 4. Write Audit Outbox Event
-      await this.outboxService.writeEvent(em, {
-        exchangeName: auditExchange,
-        routingKey:   auditRoutingKey,
-        payload: {
-          kind: 'audit',
-          eventType:    'booking.created',
-          entityType:   'FlightBooking',
-          entityId:     flightBooking.id,
-          action:       AuditAction.FLIGHT_BOOKING_CREATED,
-          performedBy:  dto.userId,
-          newValue: {
-            origin:      dto.origin,
-            destination: dto.destination,
-            totalPrice:  dto.totalPrice,
-            currency:    dto.currency,
-          },
-          correlationId: generateUUID(),
-          timestamp:     new Date().toISOString(),
-        } satisfies AuditPayload,
-      });
+        kind: 'notification',
+        transactionId: transaction.id,
+        type: 'EMAIL',
+        recipient: dto.userEmail,
+        subject: `Flight booking confirmation (${dto.origin} → ${dto.destination})`,
+        content: 'Your flight booking is confirmed. Details...',
+      } satisfies NotificationPayload);
 
       return {
         message: 'Flight booking initiated',

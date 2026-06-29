@@ -9,7 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Connection, Consumer } from 'rabbitmq-client';
 import { AuditLog } from './entities/audit-log.entity';
-import { AuditPayload } from '../outbox/types/outbox-payload.type';
+import { AuditPayload } from './types/audit-payload.type';
 
 /** Postgres unique-constraint violation error code. */
 const PG_UNIQUE_VIOLATION = '23505';

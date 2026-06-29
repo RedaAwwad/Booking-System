@@ -1,0 +1,123 @@
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { DataSource, QueryRunner, Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Client } from 'pg';
+import { FlightOutboxMessage, OutboxStatus } from './entities/flight-outbox-message.entity';
+import { FlightPublisherService } from './flight-publisher.service';
+
+@Injectable()
+export class FlightEventDispatcherService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(FlightEventDispatcherService.name);
+  private queryRunner: QueryRunner;
+
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly publisherService: FlightPublisherService,
+    @InjectRepository(FlightOutboxMessage)
+    private readonly outboxRepo: Repository<FlightOutboxMessage>,
+  ) {}
+
+  async onModuleInit() {
+    this.logger.log('Initializing FlightEventDispatcherService...');
+    
+    // Schedule pg_cron job for safety-net relay
+    try {
+      await this.dataSource.query(`SELECT cron.unschedule('flight-outbox-relay');`).catch(() => {});
+      await this.dataSource.query(`
+        SELECT cron.schedule('flight-outbox-relay', '*/5 * * * *', $$
+          DO $body$ DECLARE rec RECORD;
+          BEGIN
+            FOR rec IN SELECT * FROM flight_outbox_messages WHERE status = 'READY' ORDER BY created_at ASC
+            LOOP
+              PERFORM pg_notify('flight_outbox', row_to_json(rec)::text);
+            END LOOP;
+          END; $body$;
+        $$);
+      `);
+      this.logger.log('Flight outbox pg_cron job scheduled.');
+    } catch (e) {
+      this.logger.warn('Could not schedule flight outbox relay via pg_cron.', e);
+    }
+
+    await this.setupListener();
+  }
+
+  private async setupListener() {
+    try {
+      this.queryRunner = this.dataSource.createQueryRunner();
+      const pgClient: Client = await this.queryRunner.connect();
+
+      if (!pgClient || typeof pgClient.on !== 'function') {
+        this.logger.error('Cannot access raw pg.Client — LISTEN/NOTIFY will not work.');
+        return;
+      }
+
+      pgClient.on('error', (err) => {
+        this.logger.error('pg connection error in FlightEventDispatcherService', err);
+      });
+
+      pgClient.on('end', () => {
+        this.logger.warn('pg connection ended unexpectedly. Reconnecting in 5s...');
+        this.queryRunner.release().catch(() => {});
+        setTimeout(() => this.setupListener(), 5000);
+      });
+
+      pgClient.on('notification', (msg) => {
+        if (msg.channel !== 'flight_outbox' || !msg.payload) return;
+
+        let raw: any;
+        try {
+          raw = JSON.parse(msg.payload);
+        } catch {
+          this.logger.error('Failed to parse notification payload', msg.payload);
+          return;
+        }
+
+        const record = this.mapRawToEntity(raw);
+        this.logger.log(`Received notification for flight outbox record [${record.id}]`);
+
+        this.publisherService
+          .publishRecord(record)
+          .catch((e) => this.logger.error('Failed to publish flight outbox record', e));
+      });
+
+      await this.queryRunner.query(`LISTEN flight_outbox`);
+      this.logger.log('Successfully listening on flight_outbox');
+
+      await this.processBootstrapMessages();
+    } catch (e) {
+      this.logger.error('Failed to initialize FlightEventDispatcherService', e);
+    }
+  }
+
+  private async processBootstrapMessages() {
+    this.logger.log('Processing bootstrap flight outbox messages...');
+    try {
+      const records = await this.outboxRepo.find({
+        where: { status: OutboxStatus.READY },
+        order: { createdAt: 'ASC' },
+      });
+      for (const record of records) {
+        await this.publisherService.publishRecord(record);
+      }
+    } catch (e) {
+      this.logger.error('Failed to process bootstrap flight outbox messages', e);
+    }
+  }
+
+  private mapRawToEntity(raw: any): FlightOutboxMessage {
+    const entity = new FlightOutboxMessage();
+    entity.id = raw.id;
+    entity.payload = raw.payload;
+    entity.status = raw.status;
+    entity.failedAt = raw.failed_at ? new Date(raw.failed_at) : null;
+    entity.createdAt = raw.created_at ? new Date(raw.created_at) : new Date();
+    return entity;
+  }
+
+  async onModuleDestroy() {
+    if (this.queryRunner && !this.queryRunner.isReleased) {
+      await this.queryRunner.release();
+    }
+  }
+}

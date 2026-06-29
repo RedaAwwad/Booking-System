@@ -4,26 +4,20 @@ import {
   Column,
   CreateDateColumn,
 } from 'typeorm';
-import type { OutboxPayload } from '../types/outbox-payload.type';
+import type { HotelOutboxEvent } from '../types/hotel-outbox-event.type';
 
 export enum OutboxStatus {
   READY = 'READY',
   FAILED = 'FAILED',
 }
 
-@Entity('outbox_messages')
-export class OutboxMessage {
+@Entity('hotel_outbox_messages')
+export class HotelOutboxMessage {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 255, name: 'exchange_name' })
-  exchangeName: string;
-
-  @Column({ type: 'varchar', length: 255, name: 'routing_key' })
-  routingKey: string;
-
   @Column({ type: 'jsonb' })
-  payload: OutboxPayload;
+  payload: HotelOutboxEvent;
 
   @Column({ type: 'varchar', length: 50, default: OutboxStatus.READY })
   status: string;
