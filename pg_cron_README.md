@@ -296,6 +296,29 @@ export PATH=/usr/pgsql-18/bin:$PATH
 make && sudo PATH=$PATH make install
 ```
 
+## Windows
+
+Ensure [C++ support in Visual Studio](https://learn.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-170#download-and-install-the-tools) is installed and run `x64 Native Tools Command Prompt for VS [version]` as administrator. Then use `nmake` to build:
+
+```cmd
+set "PGROOT=C:\Program Files\PostgreSQL\18"
+cd %TMP%
+git clone https://github.com/citusdata/pg_cron.git
+cd pg_cron
+nmake /F Makefile.win
+nmake /F Makefile.win install
+```
+
+### Installation Notes - Windows
+
+#### Missing Header
+
+If compilation fails with `Cannot open include file: 'postgres.h': No such file or directory`, make sure `PGROOT` is correct.
+
+#### Permissions
+
+If installation fails with `Access is denied`, re-run the installation instructions as an administrator.
+
 # Setting up pg_cron
 
 To start the pg_cron background worker, you need to add pg_cron to `shared_preload_libraries` in postgresql.conf. Note that pg_cron does not run any jobs as a long a server is in [hot standby](https://www.postgresql.org/docs/current/static/hot-standby.html) mode, but it automatically starts when the server is promoted.
@@ -455,16 +478,20 @@ The following table keeps track of which of the major managed Postgres services 
 | [Alibaba Cloud](https://www.alibabacloud.com/help/doc-detail/150355.htm) | :heavy_check_mark: |
 | [Amazon RDS](https://aws.amazon.com/rds/postgresql/)     | :heavy_check_mark:      |          |
 | [Azure](https://azure.microsoft.com/en-us/services/postgresql/) | :heavy_check_mark:  |
+| [Clickhouse](https://clickhouse.com/docs/cloud/managed-postgres/extensions)  | :heavy_check_mark:  |
 | [Crunchy Bridge](https://www.crunchydata.com/products/crunchy-bridge/?ref=producthunt) | :heavy_check_mark: |
 | [DigitalOcean](https://www.digitalocean.com/products/managed-databases/) | :heavy_check_mark: |
 | [Google Cloud](https://cloud.google.com/sql/postgresql/) | :heavy_check_mark: |
 | [Heroku](https://elements.heroku.com/addons/heroku-postgresql) | :x: |
 | [Instaclustr](https://instaclustr.com) | :heavy_check_mark:  |
+| [Lakebase](https://docs.databricks.com/aws/en/oltp/projects/extensions) | :x: |
 | [Neon](https://neon.tech/docs/extensions/extensions-intro#tooling-admin) | :heavy_check_mark: |
 | [PlanetScale](https://planetscale.com/docs/postgres/extensions) | :heavy_check_mark: |
 | [ScaleGrid](https://scalegrid.io/postgresql.html) | :heavy_check_mark:  |
 | [Scaleway](https://www.scaleway.com/en/database/) | :heavy_check_mark:  |
+| [Snowflake](https://www.scaleway.com/en/database/) | :heavy_check_mark:  |
 | [Supabase](https://supabase.io/docs/guides/database) | :heavy_check_mark:  |
+| [Ubicloud](https://www.ubicloud.com/docs/managed-postgresql/extensions) | :heavy_check_mark:  |
 | [YugabyteDB](https://www.yugabyte.com/) | :heavy_check_mark:  |
 
 # Code of Conduct

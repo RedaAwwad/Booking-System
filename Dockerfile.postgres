@@ -6,12 +6,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-server-dev-18 \
     git \
     ca-certificates \
+    gettext \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone and install pg_cron effortlessly
+# Clone and install pg_cron
+# On Debian/glibc, intl symbols live inside libc.so.6 — there is no separate
+# libintl.so file. A recent pg_cron commit added -lintl to SHLIB_LINK for NLS
+# support, which breaks the link on this platform.
+# We patch every file in the repo that mentions -lintl before building.
 RUN git clone https://github.com/citusdata/pg_cron.git \
     && cd pg_cron \
-    && make && make install \
+    && grep -rl -- '-lintl' . | xargs sed -i 's/-lintl//g' \
+    && make \
+    && make install \
     && cd .. && rm -rf pg_cron
 
 # Copy your initialization script

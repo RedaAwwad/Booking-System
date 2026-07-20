@@ -22,4 +22,9 @@ transport.port: 9300
 # -Xms512m -Xmx512m for dev
 
 # Index settings defaults
-action.auto_create_index: "booking-*,logstash-*,.kibana*"
+# booking-*      → booking-api-logs-* (NestJS app logs)
+# infra-logs-*   → postgres, redis, rabbitmq, nginx logs
+# logstash-*     → Logstash internal indices
+# .kibana*       → Kibana internal indices
+action.auto_create_index: "booking-*,infra-logs-*,logstash-*,.kibana*"
+

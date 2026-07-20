@@ -25,6 +25,8 @@ services:
       REDIS_PORT: 6379
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      # Tell Winston to emit JSON logs so Filebeat/Logstash can parse them
+      DOCKER_ENV: "true"
     depends_on:
       redis:
         condition: service_healthy
