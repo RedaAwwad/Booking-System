@@ -51,38 +51,53 @@ With ELK, **all** logs flow into a single searchable store. You can:
 
 ```mermaid
 graph TB
-    subgraph "Docker Host"
-        subgraph "Booking Services (profile: fullstack)"
-            APP["🟢 booking-api\n(NestJS + Winston)\nPort 3000"]
+    subgraph DH["Docker Host"]
+        subgraph FULLSTACK["Booking Services — profile: fullstack"]
+            APP["🟢 booking-api\nNestJS + Winston\nPort 3000"]
             PG["🐘 booking_postgres\nPort 5432"]
             RD["🔴 booking_redis\nPort 6379"]
             RMQ["🐇 booking_rabbitmq\nPort 5672"]
             NGX["⚡ booking_nginx\nPort 8080"]
         end
 
-        subgraph "ELK Stack (profile: monitoring)"
-            FB["📦 booking_filebeat\n(Log Shipper)"]
+        DOCKERLOGS["/var/lib/docker/containers/*/*.log\nHost filesystem — ALL containers write here"]
+
+        subgraph ELK["ELK Stack — profile: monitoring"]
+            FB["📦 booking_filebeat\nLog Shipper"]
             LS["⚙️ booking_logstash\nPort 5044 / 9600"]
             ES["🔍 booking_elasticsearch\nPort 9200"]
             KB["📊 booking_kibana\nPort 5601"]
         end
-
-        DOCKERLOGS["/var/lib/docker/containers/*/*.log\n(Host filesystem)"]
     end
 
+    DEV["👩‍💻 Developer\nlocalhost:5601"]
+
     APP -->|stdout JSON| DOCKERLOGS
-    PG -->|stdout text| DOCKERLOGS
-    RD -->|stdout text| DOCKERLOGS
-    RMQ -->|stdout text| DOCKERLOGS
+    PG -->|stdout plain-text| DOCKERLOGS
+    RD -->|stdout plain-text| DOCKERLOGS
+    RMQ -->|stdout plain-text| DOCKERLOGS
+    NGX -->|stdout plain-text| DOCKERLOGS
 
-    DOCKERLOGS -->|"container input\n(reads log files)"| FB
-    FB -->|"drops ELK container logs\n(prevents feedback loop)"| FB
-    FB -->|"Beats protocol\nPort 5044"| LS
-    LS -->|"HTTP REST\nPort 9200"| ES
-    ES -->|"REST API"| KB
+    DOCKERLOGS -->|"reads ALL log files"| FB
+    FB -->|"drop_event: skip ELK\ncontainers own logs"| FB
+    FB -->|"Beats protocol port 5044"| LS
 
-    DEV["👩‍💻 Developer"] -->|"http://localhost:5601"| KB
+    LS -->|"booking-api: JSON-parsed\nstructured fields"| ES
+    LS -->|"all others: plain text\nraw message"| ES
+
+    ES --> KB
+    KB --> DEV
 ```
+
+
+> **Why nginx logs appear in Elasticsearch too:**
+> Filebeat reads **every** container's log files — there is no filtering at the read stage.
+> The only place filtering happens is **inside Logstash**: the JSON parsing block is scoped to
+> `container_name == "booking-api"` only, so nginx/postgres/redis/rabbitmq logs are still
+> indexed but land in Elasticsearch as a raw `message` string with no promoted fields.
+> You can still search them in Kibana by `container_name: "booking_nginx"`.
+
+
 
 ### Key Design Decisions
 
