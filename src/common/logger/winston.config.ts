@@ -55,8 +55,9 @@ export const winstonConfig: WinstonModuleOptions = {
       // In Docker: JSON to stdout → Filebeat picks it up
       // Locally:   pretty coloured output
       format: isDockerOrCI ? jsonFormat : prettyFormat,
-      // Suppress below 'warn' in production to reduce noise; show everything locally
-      level: isDockerOrCI ? 'warn' : 'debug',
+      // info in Docker so Winston/Filebeat captures operational logs (bookings, payments, etc.)
+      // debug locally so the terminal shows everything during development
+      level: isDockerOrCI ? 'info' : 'debug',
     }),
   ],
 };
