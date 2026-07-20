@@ -89,14 +89,20 @@ graph TB
     KB --> DEV
 ```
 
-
-> **Why nginx logs appear in Elasticsearch too:**
-> Filebeat reads **every** container's log files — there is no filtering at the read stage.
-> The only place filtering happens is **inside Logstash**: the JSON parsing block is scoped to
-> `container_name == "booking-api"` only, so nginx/postgres/redis/rabbitmq logs are still
-> indexed but land in Elasticsearch as a raw `message` string with no promoted fields.
-> You can still search them in Kibana by `container_name: "booking_nginx"`.
-
+> [!IMPORTANT]
+> **All container logs land in Elasticsearch — no exceptions.**
+> Filebeat ships every container's stdout. The `container_name == "booking-api"` condition
+> in Logstash only controls **JSON field parsing and promotion** — it does NOT drop or exclude
+> anything. Redis, RabbitMQ, Postgres, and Nginx logs are all indexed. They just arrive as
+> a raw `message` string without promoted fields (`level`, `context`, etc.).
+>
+> **Searching infra logs in Kibana:**
+> ```
+> container_name: "booking_rabbitmq"   → RabbitMQ's own logs
+> container_name: "booking_postgres"   → Postgres logs
+> container_name: "booking_redis"      → Redis logs
+> container_name: "booking_nginx"      → Nginx access/error logs
+> ```
 
 
 ### Key Design Decisions
@@ -112,36 +118,84 @@ graph TB
 
 ## 3. How a Log Travels (End-to-End Flow)
 
+There are **two paths** — one for your NestJS app (structured JSON), one for infrastructure containers (plain text). Both end up in Elasticsearch.
+
+### Path A — NestJS App (booking-api)
+
 ```mermaid
 sequenceDiagram
-    participant App as NestJS App<br/>(booking-api)
-    participant Docker as Docker Runtime<br/>(Host)
+    participant App as NestJS App
+    participant Docker as Docker Runtime
     participant FB as Filebeat
     participant LS as Logstash
     participant ES as Elasticsearch
     participant KB as Kibana
 
-    App->>Docker: logger.log('FlightBooking created')<br/>→ stdout as JSON
-    Note over Docker: Wraps in Docker envelope:<br/>{"log":"...", "stream":"stdout", "time":"..."}
-    Note over Docker: Writes to<br/>/var/lib/docker/containers/<id>/<id>-json.log
+    App->>Docker: logger.error('RabbitMQ publish failed')<br/>→ stdout as JSON
+    Note over Docker: Wraps in Docker envelope and writes to<br/>/var/lib/docker/containers/<id>-json.log
 
     FB->>Docker: Reads log file (inotify watch)
     Docker-->>FB: New log line
-    FB->>FB: add_docker_metadata()<br/>attaches container.name, container.image
-    FB->>FB: drop_event() check<br/>Is this an ELK container? → drop it
+    FB->>FB: add_docker_metadata()<br/>attaches container.name = "booking-api"
+    FB->>FB: drop_event() — Is this an ELK container? No → keep it
     FB->>LS: Ships event via Beats protocol (port 5044)
 
-    LS->>LS: Filter Step 1:<br/>Copy container.name → container_name
-    LS->>LS: Filter Step 2:<br/>Is container_name == "booking-api"?<br/>Parse message as JSON
-    LS->>LS: Promote fields:<br/>level, log_message, context,<br/>service, pid, @timestamp
-    LS->>LS: Filter Step 3:<br/>Remove noisy fields (agent, ecs, host...)
+    LS->>LS: Filter Step 1: Copy container.name → container_name
+    LS->>LS: Filter Step 2: container_name == "booking-api" ✅<br/>→ JSON-parse message<br/>→ promote level, log_message, context, service, pid
+    LS->>LS: Filter Step 3: Remove noisy fields (agent, ecs, host...)
+    LS->>ES: Index as fully structured document<br/>booking-api-logs-YYYY.MM.dd
 
-    LS->>ES: Index document into<br/>booking-api-logs-2026.07.20
-
-    KB->>ES: Query (user opens Discover)
-    ES-->>KB: Returns matching documents
-    KB-->>Dev: Renders searchable log table
+    KB->>ES: Query (user searches by level: "error")
+    ES-->>KB: Returns structured documents
+    KB-->>Dev: level, context, log_message, timestamp all filterable
 ```
+
+### Path B — Infrastructure Containers (rabbitmq, redis, postgres, nginx)
+
+```mermaid
+sequenceDiagram
+    participant RMQ as RabbitMQ Container
+    participant Docker as Docker Runtime
+    participant FB as Filebeat
+    participant LS as Logstash
+    participant ES as Elasticsearch
+    participant KB as Kibana
+
+    RMQ->>Docker: [ERROR] AMQP connection rejected<br/>→ stdout as plain text
+    Note over Docker: Writes to /var/lib/docker/containers/<id>-json.log
+
+    FB->>Docker: Reads log file
+    Docker-->>FB: New log line
+    FB->>FB: add_docker_metadata()<br/>attaches container.name = "booking_rabbitmq"
+    FB->>FB: drop_event() — Is this an ELK container? No → keep it
+    FB->>LS: Ships event via Beats protocol
+
+    LS->>LS: Filter Step 1: Copy container.name → container_name
+    LS->>LS: Filter Step 2: container_name == "booking-api"? ❌<br/>→ skip JSON parsing, pass through as-is
+    LS->>LS: Filter Step 3: Remove noisy fields
+    LS->>ES: Index as raw document<br/>message = "[ERROR] AMQP connection rejected"
+
+    KB->>ES: Query container_name: "booking_rabbitmq"
+    ES-->>KB: Returns raw message strings
+    KB-->>Dev: Searchable by text, but no level/context fields
+```
+
+### The Two-Signal Model for Infrastructure Failures
+
+When RabbitMQ goes down you get **two independent signals in Kibana**:
+
+| Signal | KQL Query | What you see |
+|--------|-----------|-------------|
+| RabbitMQ's own crash logs | `container_name: "booking_rabbitmq"` | Internal broker errors, connection resets |
+| NestJS app's reaction | `level: "error" AND context: "RabbitMQService"` | "Failed to publish", retry attempts, stack traces |
+
+The NestJS signal is usually more actionable because it tells you **which operation failed** and **which user/request was affected**, not just that the broker had a problem.
+
+> [!NOTE]
+> The terminal flooding we fixed earlier had nothing to do with infrastructure logs being too
+> noisy. It was caused by two separate bugs:
+> 1. `stdout { rubydebug }` in the Logstash pipeline printing every event to terminal
+> 2. A feedback loop where ELK containers' own logs were being shipped back into Logstash
 
 ---
 
