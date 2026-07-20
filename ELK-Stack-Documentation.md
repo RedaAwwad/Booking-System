@@ -710,23 +710,22 @@ To ship logs from a new microservice you add later:
    if [container_name] in ["booking-api", "my-new-service"] and [message] =~ /^\{/ {
    ```
 
-### Adding Log Retention (ILM)
+### Log Retention (ILM)
 
-By default, indices grow forever. To auto-delete old logs:
+By default, Elasticsearch indices grow forever. We use Index Lifecycle Management (ILM) to automatically delete old logs.
 
-```bash
-# Create an ILM policy that deletes indices older than 30 days
-curl -X PUT http://localhost:9200/_ilm/policy/booking-logs-policy -H 'Content-Type: application/json' -d '{
-  "policy": {
-    "phases": {
-      "delete": {
-        "min_age": "30d",
-        "actions": { "delete": {} }
-      }
-    }
-  }
-}'
+This is **fully automated** in this project. When you start the stack, a one-shot container named `elasticsearch-setup` runs `elk/scripts/setup-ilm.sh`.
+
+It does two things:
+1. Creates an ILM policy (`booking-logs-policy`) to delete indices older than X days.
+2. Creates an index template (`booking-api-logs-template`) that applies this policy to all newly created `booking-api-logs-*` indices.
+
+You can configure the retention period in your `.env` file:
+```env
+# How many days Elasticsearch will keep logs before deleting them
+LOG_RETENTION_DAYS=30
 ```
+
 
 ### Enabling Production Security
 

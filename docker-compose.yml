@@ -135,6 +135,22 @@ services:
       start_period: 60s
     restart: unless-stopped
 
+  elasticsearch-setup:
+    image: curlimages/curl:8.7.1
+    container_name: booking_elasticsearch_setup
+    profiles: [monitoring]
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./elk/scripts/setup-ilm.sh:/setup-ilm.sh:ro
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-30}
+    command: /bin/sh /setup-ilm.sh
+    # This is a one-shot container that exits after configuring ES
+    restart: "no"
+
   logstash:
     image: docker.elastic.co/logstash/logstash:${ELK_VERSION:-8.13.0}
     container_name: booking_logstash
