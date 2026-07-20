@@ -1,6 +1,39 @@
 name: booking-system
 
 services:
+  node-app:
+    container_name: booking-api
+    build:
+      context: .
+      target: development
+    profiles: [fullstack]
+    labels:
+      # Filebeat uses this label to identify and ship this container's logs to Logstash
+      com.booking.service: "booking-api"
+    volumes:
+      - ./src:/app/src
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      PORT: ${PORT:-3000}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
   redis:
     image: redis:8.6-alpine
     container_name: booking_redis
@@ -65,39 +98,11 @@ services:
       timeout: 10s
       retries: 5
 
-  node-app:
-    container_name: booking-api
-    build:
-      context: .
-      target: development
-    profiles: [fullstack]
-    volumes:
-      - ./src:/app/src
-    ports:
-      - "${PORT:-3000}:3000"
-    env_file:
-      - .env
-    environment:
-      PORT: ${PORT:-3000}
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-      DATABASE_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME}?schema=public
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
-
   nginx:
-    image: nginx:alpine
+    image: nginx:1.31.2-alpine
     container_name: booking_nginx
+    # nginx only makes sense when node-app is running, so it shares the same profile
+    profiles: [fullstack]
     ports:
       - "8080:80"
     volumes:
@@ -106,7 +111,90 @@ services:
       - node-app
     restart: unless-stopped
 
+  # ── ELK Stack (opt-in via --profile monitoring) ─────────────────────────────
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELK_VERSION:-8.13.0}
+    container_name: booking_elasticsearch
+    profiles: [monitoring]
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      # Keep heap small for dev — raise if you see OutOfMemory errors
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+      - ./elk/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qv '\"status\":\"red\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${ELK_VERSION:-8.13.0}
+    container_name: booking_logstash
+    profiles: [monitoring]
+    environment:
+      - LS_JAVA_OPTS=-Xms256m -Xmx256m
+    volumes:
+      - ./elk/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - "5044:5044"   # Beats input (Filebeat → Logstash)
+      - "9600:9600"   # Logstash monitoring API
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELK_VERSION:-8.13.0}
+    container_name: booking_kibana
+    profiles: [monitoring]
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - XPACK_SECURITY_ENABLED=false
+    ports:
+      - "5601:5601"   # Kibana UI
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status | grep -q 'available'"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+    restart: unless-stopped
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:${ELK_VERSION:-8.13.0}
+    container_name: booking_filebeat
+    profiles: [monitoring]
+    # Run as root so Filebeat can read Docker log files on the host
+    user: root
+    # --strict.perms=false: required on Windows/Mac because NTFS-mounted files
+    # always appear as 777 to Linux containers; Filebeat refuses world-writable
+    # configs by default, so we bypass that check here.
+    command: filebeat -e --strict.perms=false
+    volumes:
+      - ./elk/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      # Mount Docker socket and log directory from the host
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - filebeat_data:/usr/share/filebeat/data
+    depends_on:
+      - logstash
+    restart: unless-stopped
+
 volumes:
   redis_data:
   postgres_data:
   rabbitmq_data:
+  elasticsearch_data:
+  filebeat_data:

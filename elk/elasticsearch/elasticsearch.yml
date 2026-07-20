@@ -1,0 +1,25 @@
+# ─── Elasticsearch Dev Configuration ───────────────────────────────────────────
+# Single-node cluster, security disabled (dev mode).
+# For production: enable xpack.security.enabled and configure TLS + passwords.
+
+cluster.name: "booking-system"
+node.name: "es-node-1"
+
+# Run as a single node (no cluster discovery needed)
+discovery.type: single-node
+
+# Disable X-Pack security for dev — no passwords, no TLS
+xpack.security.enabled: false
+
+# Allow traffic from any host (Docker network)
+network.host: 0.0.0.0
+
+# HTTP and transport ports
+http.port: 9200
+transport.port: 9300
+
+# Memory settings — controlled via ES_JAVA_OPTS in docker-compose
+# -Xms512m -Xmx512m for dev
+
+# Index settings defaults
+action.auto_create_index: "booking-*,logstash-*,.kibana*"

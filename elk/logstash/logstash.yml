@@ -1,0 +1,19 @@
+# ─── Logstash Settings ──────────────────────────────────────────────────────────
+# General Logstash node settings (not the pipeline — that lives in pipeline/)
+
+http.host: "0.0.0.0"
+http.port: 9600
+
+# Pipeline settings
+pipeline.id: main
+path.config: /usr/share/logstash/pipeline
+
+# Worker threads — 1 is fine for dev
+pipeline.workers: 1
+
+# Batch size: number of events per worker per cycle
+pipeline.batch.size: 125
+pipeline.batch.delay: 50
+
+# Log level
+log.level: info

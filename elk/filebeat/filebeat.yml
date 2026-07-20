@@ -1,0 +1,43 @@
+# ─── Filebeat Configuration ─────────────────────────────────────────────────────
+# Filebeat tails Docker container log files and ships them to Logstash.
+# It runs as a container with access to /var/lib/docker/containers on the host.
+
+filebeat.inputs:
+  - type: container
+    paths:
+      - "/var/lib/docker/containers/*/*.log"
+
+    # NOTE: The `container` input type natively parses Docker's JSON log envelope
+    # { "log": "...", "stream": "stdout", "time": "..." } automatically.
+    # Do NOT add json.message_key here — it causes double-parse errors.
+
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+
+      # ── Drop events from ELK containers themselves to prevent feedback loops ──
+      # Without this, Logstash/ES/Kibana/Filebeat logs get shipped TO Logstash,
+      # which logs more, which gets shipped again — an infinite amplifying loop.
+      - drop_event:
+          when:
+            or:
+              - contains:
+                  container.name: "booking_elasticsearch"
+              - contains:
+                  container.name: "booking_logstash"
+              - contains:
+                  container.name: "booking_kibana"
+              - contains:
+                  container.name: "booking_filebeat"
+
+# ── Output ──────────────────────────────────────────────────────────────────────
+output.logstash:
+  hosts: ["logstash:5044"]
+
+# ── Logging ─────────────────────────────────────────────────────────────────────
+logging.level: warning
+logging.to_files: false
+
+# ── Registry ────────────────────────────────────────────────────────────────────
+# Filebeat keeps a registry of file offsets so it never re-ships already-sent lines.
+filebeat.registry.path: /usr/share/filebeat/data/registry

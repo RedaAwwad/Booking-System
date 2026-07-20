@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ClsModule } from 'nestjs-cls';
+import { WinstonModule } from 'nest-winston';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FlightsModule } from './modules/flights/flights.module';
@@ -13,10 +14,13 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { CustomerModule } from './modules/customer/customer.module';
+import { winstonConfig } from './common/logger/winston.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Winston logger — JSON in Docker (for ELK), pretty colours locally
+    WinstonModule.forRoot(winstonConfig),
     // ClsModule propagates request context (userId, etc.) through async call chains
     // via AsyncLocalStorage so TypeORM subscribers can read it without DI injection.
     ClsModule.forRoot({

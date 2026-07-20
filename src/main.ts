@@ -1,11 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { SanitizePipe } from './common/sanitize/sanitize.pipe';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    // Suppress the default NestJS logger during bootstrap so Winston takes over immediately
+    bufferLogs: true,
+  });
+
+  // Replace the built-in NestJS logger with Winston for all Logger() calls in the app
+  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+
+  const logger = new Logger('Bootstrap');
 
   app.setGlobalPrefix('api/v1', {
     exclude: ['/', '/health', '/api-docs'],
@@ -40,11 +49,9 @@ async function bootstrap() {
   SwaggerModule.setup('api-docs', app, documentFactory);
 
   await app.listen(process.env.PORT ?? 3000);
-  console.log('The App is running on port', process.env.PORT ?? 3000);
-  console.log(
-    'The API documentation is available via: http://localhost:' +
-      (process.env.PORT ?? 3000) +
-      '/api-docs',
+  logger.log(`Server running on port ${process.env.PORT ?? 3000}`);
+  logger.log(
+    `API documentation available at: http://localhost:${process.env.PORT ?? 3000}/api-docs`,
   );
 }
 
