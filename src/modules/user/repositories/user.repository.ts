@@ -10,7 +10,7 @@ export class UserRepository {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   // Helper: resolve the right query runner (transaction or root datasource)
   private db(tx?: EntityManager): { query: (sql: string, params?: any[]) => Promise<any> } {
@@ -54,8 +54,13 @@ export class UserRepository {
     return rows.length > 0;
   }
 
-  async findUserByKeycloakId(keycloakId: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { keycloakId } });
+  async findUserIdByKeycloakId(keycloakId: string): Promise<User | null> {
+    const user = await this.userRepository.findOne({
+      where: { keycloakId },
+      select: { id: true },
+    });
+
+    return user;
   }
 
   async findUserByEmail(email: string, select?: FindOptionsSelect<User>): Promise<User | null> {

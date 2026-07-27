@@ -179,7 +179,7 @@ export class KeycloakAdminService {
     });
 
     // 3. Mirror state to local DB
-    const localUser = await this.userService.findUserByKeycloakId(keycloakId);
+    const localUser = await this.userService.findUserIdByKeycloakId(keycloakId);
     if (localUser) {
       await this.userService.updateUserById(localUser.id, { isActive: false });
     }
@@ -204,7 +204,7 @@ export class KeycloakAdminService {
       );
     });
 
-    const localUser = await this.userService.findUserByKeycloakId(keycloakId);
+    const localUser = await this.userService.findUserIdByKeycloakId(keycloakId);
     if (localUser) {
       await this.userService.updateUserById(localUser.id, { isActive: true });
     }

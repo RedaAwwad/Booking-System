@@ -28,8 +28,8 @@ export class UserService {
     return this.userRepository.findAndUpdateUserByEmail(userId, email, data);
   }
 
-  async findUserByKeycloakId(keycloakId: string): Promise<User | null> {
-    return this.userRepository.findUserByKeycloakId(keycloakId);
+  async findUserIdByKeycloakId(keycloakId: string): Promise<User | null> {
+    return this.userRepository.findUserIdByKeycloakId(keycloakId);
   }
 
   async findUserByEmail(email: string, select?: FindOptionsSelect<User>) {

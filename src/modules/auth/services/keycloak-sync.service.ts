@@ -17,11 +17,11 @@ import type { KeycloakTokenPayload } from '../../../common/guards/auth.guard';
 export class KeycloakSyncService {
   private readonly logger = new Logger(KeycloakSyncService.name);
 
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   async syncUser(payload: KeycloakTokenPayload): Promise<User> {
     // 1. Fast-path: known user
-    const existing = await this.userService.findUserByKeycloakId(payload.sub);
+    const existing = await this.userService.findUserIdByKeycloakId(payload.sub);
     if (existing) return existing;
 
     // 2. First login — auto-provision from KC token claims
