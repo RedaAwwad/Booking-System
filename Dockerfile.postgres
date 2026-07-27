@@ -15,10 +15,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # libc on this platform so the -lintl flag produces a "cannot find" link error.
 RUN git clone --branch v1.6.7 --depth 1 https://github.com/citusdata/pg_cron.git \
     && cd pg_cron \
-    && grep -rl -- '-lintl' . | xargs sed -i 's/-lintl//g' \
+    && grep -rl -- '-lintl' . | xargs -r sed -i 's/-lintl//g' \
     && make \
     && make install \
     && cd .. && rm -rf pg_cron
 
-# Copy your initialization script
-COPY ./init-pgcron.sql /docker-entrypoint-initdb.d/
+# Copy initialization scripts (run alphabetically on first postgres startup)
+COPY ./init-pgcron.sql /docker-entrypoint-initdb.d/01-init-pgcron.sql
+COPY ./init-keycloak-db.sql /docker-entrypoint-initdb.d/02-init-keycloak-db.sql

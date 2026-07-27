@@ -1,12 +1,14 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SanitizePipe } from './common/sanitize/sanitize.pipe';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Suppress the default NestJS logger during bootstrap so Winston takes over immediately
     bufferLogs: true,
   });
@@ -16,8 +18,22 @@ async function bootstrap() {
 
   const logger = new Logger('Bootstrap');
 
+  // ── EJS view engine ──────────────────────────────────────────────────────
+  // Used for the developer login page (/login) and PKCE callback (/auth/callback).
+  // process.cwd() resolves to the project root whether running via ts-node or compiled.
+  app.setBaseViewsDir(join(process.cwd(), 'views'));
+  app.setViewEngine('ejs');
+
+  // ── Global prefix ────────────────────────────────────────────────────────
   app.setGlobalPrefix('api/v1', {
-    exclude: ['/', '/health', '/api-docs'],
+    exclude: [
+      '/',
+      '/health',
+      '/api-docs',
+      '/login',           // Developer login page (EJS)
+      '/auth/callback',   // Keycloak PKCE callback (EJS)
+      '/logout',          // Browser Keycloak SSO logout
+    ],
   });
 
   app.useGlobalPipes(
@@ -41,6 +57,7 @@ async function bootstrap() {
       'API documentation for fetching flights from different providers',
     )
     .setVersion('1.0')
+    .addBearerAuth() // ← Documents the KC bearer token in Swagger
     .build();
   const documentFactory = () =>
     SwaggerModule.createDocument(app, config, {
@@ -52,6 +69,9 @@ async function bootstrap() {
   logger.log(`Server running on port ${process.env.PORT ?? 3000}`);
   logger.log(
     `API documentation available at: http://localhost:${process.env.PORT ?? 3000}/api-docs`,
+  );
+  logger.log(
+    `Developer login page: http://localhost:${process.env.PORT ?? 3000}/login`,
   );
 }
 

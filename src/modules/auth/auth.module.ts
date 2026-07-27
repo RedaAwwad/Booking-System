@@ -1,23 +1,22 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtModule } from '@nestjs/jwt';
-import { AuthService } from './services/auth.service';
-import { UserTokenService } from './services/user-token.service';
-import { UserTokenRepository } from './repositories/user-token.repository';
 import { AuthController } from './controllers/auth.controller';
+import { LoginController } from './controllers/login.controller';
+import { AdminController } from './controllers/admin.controller';
+import { KeycloakAdminService } from './services/keycloak-admin.service';
+import { HttpModule } from '@nestjs/axios';
 import { UserModule } from '../user/user.module';
 import { CustomerModule } from '../customer/customer.module';
-import { Role } from '../user/entities/role.entity';
+import { KeycloakModule } from './keycloak.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Role]),  // for AuthService role queries
-    JwtModule.register({}),
+    HttpModule,
     UserModule,
     CustomerModule,
+    KeycloakModule,
   ],
-  controllers: [AuthController],
-  providers: [AuthService, UserTokenService, UserTokenRepository],
-  exports: [AuthService],
+  controllers: [AuthController, LoginController, AdminController],
+  providers: [KeycloakAdminService],
+  exports: [KeycloakModule, KeycloakAdminService],
 })
 export class AuthModule {}

@@ -10,10 +10,9 @@ import { USER_MODULE_API } from './interfaces/user-module.interface';
 import { UserModuleFacade } from './facades/user-module.facade';
 import { User } from './entities/user.entity';
 import { Role } from './entities/role.entity';
-import { UserToken } from './entities/user-token.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Role, UserToken])],
+  imports: [TypeOrmModule.forFeature([User, Role])],
   controllers: [UserController, RoleController],
   providers: [
     UserService,

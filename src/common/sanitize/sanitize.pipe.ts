@@ -4,22 +4,25 @@ import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class SanitizePipe implements PipeTransform {
+  private toValidate(metatype: Function): boolean {
+    const types: Function[] = [String, Boolean, Number, Array, Object];
+    return !types.includes(metatype);
+  }
+
   transform(value: any, metadata: ArgumentMetadata) {
-    // 1. Check if metatype exists (it might not for simple primitives/strings)
-    if (!metadata.metatype) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    // 1. Skip if no metatype, if value is empty/not an object, or if metatype is a built-in primitive/generic JS type
+    if (!metadata.metatype || !value || typeof value !== 'object' || !this.toValidate(metadata.metatype)) {
       return value;
     }
 
     // 2. Convert raw input into an instance of the target class
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const object = plainToInstance(metadata.metatype, value);
 
     // 3. Sanitize the object in-place (removes xss, etc.)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    sanitize(object);
+    if (object && typeof object === 'object') {
+      sanitize(object);
+    }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return object;
   }
 }

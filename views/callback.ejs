@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Booking System — Authenticating…</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: #080b14;
+      color: #e2e8f0;
+    }
+
+    .orb { position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.12; pointer-events: none; }
+    .orb-1 { width: 500px; height: 500px; background: #3b82f6; top: -100px; left: -100px; }
+    .orb-2 { width: 400px; height: 400px; background: #6366f1; bottom: -80px; right: -80px; }
+
+    .card {
+      text-align: center;
+      background: linear-gradient(135deg, rgba(13,18,32,0.95), rgba(8,11,20,0.98));
+      border: 1px solid #1e2d4a;
+      border-radius: 20px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 400px;
+      animation: rise 0.5s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    @keyframes rise { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:none; } }
+
+    .status-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      display: block;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.7; transform:scale(0.95); } }
+
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    p  { font-size: 14px; color: #64748b; line-height: 1.6; }
+
+    /* Spinner ring */
+    .ring {
+      display: inline-block;
+      width: 40px; height: 40px;
+      border: 3px solid #1e2d4a;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Success state */
+    .success .ring   { display: none; }
+    .success .status-icon { animation: none; }
+
+    /* Error state */
+    .error-box {
+      display: none;
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: 10px;
+      color: #f87171;
+      font-size: 13px;
+      padding: 12px 14px;
+      margin-top: 16px;
+      text-align: left;
+    }
+    .retry-link {
+      display: block;
+      margin-top: 20px;
+      font-size: 13px;
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    .retry-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div class="card" id="card">
+    <div class="ring" id="ring"></div>
+    <span class="status-icon" id="icon" style="display:none"></span>
+    <h1 id="title">Authenticating…</h1>
+    <p id="message">Exchanging your authorization code with Keycloak. Please wait.</p>
+    <div class="error-box" id="error-box"></div>
+    <a class="retry-link" id="retry-link" href="/login" style="display:none">← Back to login</a>
+  </div>
+
+  <script>
+    // KC config injected by NestJS
+    const KC_URL    = '<%= keycloakUrl %>';
+    const REALM     = '<%= realm %>';
+    const CLIENT_ID = '<%= clientId %>';
+
+    function showError(msg) {
+      document.getElementById('ring').style.display    = 'none';
+      document.getElementById('icon').style.display    = 'block';
+      document.getElementById('icon').textContent      = '❌';
+      document.getElementById('title').textContent     = 'Authentication Failed';
+      document.getElementById('message').textContent   = 'There was a problem completing the sign-in.';
+      document.getElementById('error-box').style.display = 'block';
+      document.getElementById('error-box').textContent = msg;
+      document.getElementById('retry-link').style.display = 'block';
+    }
+
+    function showSuccess(username) {
+      document.getElementById('card').classList.add('success');
+      document.getElementById('ring').style.display    = 'none';
+      document.getElementById('icon').style.display    = 'block';
+      document.getElementById('icon').textContent      = '✅';
+      document.getElementById('title').textContent     = `Welcome, ${username}!`;
+      document.getElementById('message').textContent   = 'Signed in successfully. Redirecting to API docs…';
+    }
+
+    async function exchangeCode() {
+      const params       = new URLSearchParams(window.location.search);
+      const code         = params.get('code');
+      const returnedState = params.get('state');
+      const error        = params.get('error');
+      const errorDesc    = params.get('error_description');
+
+      // ── KC returned an error (e.g. user cancelled) ──────────────────────────
+      if (error) {
+        showError(`Keycloak error: ${error}${errorDesc ? ' — ' + errorDesc : ''}`);
+        return;
+      }
+
+      if (!code) {
+        window.location.href = '/login';
+        return;
+      }
+
+      // ── Validate state to prevent CSRF ───────────────────────────────────────
+      const savedState    = sessionStorage.getItem('pkce_state');
+      const codeVerifier  = sessionStorage.getItem('pkce_verifier');
+      const callbackUrl   = sessionStorage.getItem('pkce_callback');
+
+      sessionStorage.removeItem('pkce_state');
+      sessionStorage.removeItem('pkce_verifier');
+      sessionStorage.removeItem('pkce_callback');
+
+      if (!savedState || returnedState !== savedState) {
+        showError('State mismatch — possible CSRF attack. Please try again.');
+        return;
+      }
+      if (!codeVerifier || !callbackUrl) {
+        showError('PKCE verifier missing from session. Please try logging in again.');
+        return;
+      }
+
+      // ── Exchange code for tokens ─────────────────────────────────────────────
+      try {
+        const tokenUrl = `${KC_URL}/realms/${REALM}/protocol/openid-connect/token`;
+        const body = new URLSearchParams({
+          grant_type:    'authorization_code',
+          client_id:     CLIENT_ID,
+          redirect_uri:  callbackUrl,
+          code,
+          code_verifier: codeVerifier,
+        });
+
+        const res  = await fetch(tokenUrl, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body:    body.toString(),
+        });
+        const json = await res.json();
+
+        if (!res.ok) {
+          showError(`Token exchange failed: ${json.error_description || json.error || 'Unknown error'}`);
+          return;
+        }
+
+        // ── Store tokens ─────────────────────────────────────────────────────
+        sessionStorage.setItem('access_token', json.access_token);
+        if (json.refresh_token) sessionStorage.setItem('refresh_token', json.refresh_token);
+        if (json.id_token)      sessionStorage.setItem('id_token', json.id_token);
+
+        // Decode username from JWT payload (base64url)
+        const payloadPart = json.access_token.split('.')[1];
+        const payload     = JSON.parse(atob(payloadPart.replace(/-/g,'+').replace(/_/g,'/')));
+        const username    = payload.name || payload.preferred_username || payload.email || 'User';
+
+        showSuccess(username);
+
+        // Redirect to API docs after a short delay
+        setTimeout(() => { window.location.href = '/api-docs'; }, 1800);
+
+      } catch (err) {
+        showError('Network error during token exchange: ' + err.message);
+      }
+    }
+
+    // Run on page load
+    exchangeCode();
+  </script>
+</body>
+</html>

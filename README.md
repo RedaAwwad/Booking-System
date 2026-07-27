@@ -19,14 +19,15 @@ This project is structured as a modular monolith to ensure clear domain boundari
 
 ## 🛠 Features
 
+- **Enterprise Authentication (Keycloak IDP)**: Secured via OAuth 2.0 PKCE and JWT verification with lazy user synchronization, session revocation, and admin management. See the definitive [Keycloak Integration & Usage Guide](KEYCLOAK_INTEGRATION_AND_USAGE_GUIDE.md).
 - **Multi-Provider Flight Search**: Concurrent fetching from:
   - [Duffel](https://duffel.com/)
   - [FlightAPI.io](https://flightapi.io/)
-- **Swagger Documentation**: Automatically generated API docs with detailed request/response schemas.
+- **Swagger Documentation**: Automatically generated API docs with detailed request/response schemas and OIDC bearer authentication.
 - **Input Validation & Sanitization**: Robust request validation using `class-validator` and XSS protection via a custom `SanitizePipe`.
 - **Resilient Aggregation**: Built-in timeouts and error handling to ensure that one failing provider doesn't break the entire search request.
 - **Caching with Redis**: Performance optimization through centralized caching of search results using Redis, reducing API costs and improving response times.
-- **Docker Ready**: Easy deployment and development environment setup with Docker and Docker Compose.
+- **Docker Ready**: Easy deployment and development environment setup with Docker and Docker Compose supporting `auth`, `elk`, and `fullstack` profiles. See also [ELK Stack Documentation](ELK-Stack-Documentation.md) and [Nginx Infrastructure Guide](Adding%20Nginx%20to%20Docker%20Infrastructure.md).
 
 ## 🏁 Getting Started
 

@@ -11,7 +11,7 @@ WORKDIR /app
 FROM base AS development
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Source is bind-mounted from the host in compose for hot reload,
 # but we still COPY here so the image is self-contained if run standalone.
@@ -27,7 +27,7 @@ CMD ["npm", "run", "dev"]
 FROM base AS builder
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 
@@ -39,7 +39,7 @@ RUN npm run build
 FROM base AS production
 
 COPY --chown=node:node package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --legacy-peer-deps
 
 # Pull the compiled output from the builder stage.
 COPY --chown=node:node --from=builder /app/dist ./dist

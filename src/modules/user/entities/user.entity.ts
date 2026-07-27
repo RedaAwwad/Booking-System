@@ -5,26 +5,32 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  /** Keycloak user UUID (the `sub` claim from the KC JWT). Single source of identity. */
+  @Column({ type: 'varchar', length: 255, unique: true })
+  keycloakId: string;
+
   @Column({ type: 'varchar', length: 100 })
   name: string;
 
   @Column({ type: 'varchar', length: 255, unique: true })
   email: string;
 
-  @Column({ type: 'varchar', length: 255 })
-  password?: string;
-
+  /**
+   * Whether this account is active.
+   * Set to false when an admin blocks the user via the KC Admin API.
+   * We keep this locally so a single DB read can gate access without
+   * calling KC on every request.
+   */
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
-  @Column({ type: 'boolean', default: false })
-  isConfirmed: boolean;
-
+  /**
+   * Denormalised convenience flag — mirrored from KC realm role `admin`.
+   * Updated by KeycloakSyncService on first login; authoritative check
+   * always uses the token's realm_access.roles at runtime.
+   */
   @Column({ type: 'boolean', default: false })
   isAdmin: boolean;
-
-  @Column({ type: 'jsonb', default: [] })
-  roles: string[];
 
   @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;

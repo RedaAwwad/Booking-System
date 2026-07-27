@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RoleKey } from '../enums/role-key.enum';
+import type { KeycloakTokenPayload } from './auth.guard';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -16,16 +17,18 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest();
+    // request.user is now a KeycloakTokenPayload — roles live in realm_access.roles
+    const { user } = context.switchToHttp().getRequest<{ user: KeycloakTokenPayload }>();
 
-    if (!user || !user.userRoles) {
+    if (!user || !user.realm_access?.roles) {
       throw new ForbiddenException('Forbidden resource');
     }
 
-    const hasRole = requiredRoles.some((role) => user.userRoles.includes(role));
+    const hasRole = requiredRoles.some((role) => user.realm_access?.roles.includes(role));
     if (!hasRole) {
       throw new ForbiddenException('You do not have permission to perform this action');
     }
+
     return true;
   }
 }

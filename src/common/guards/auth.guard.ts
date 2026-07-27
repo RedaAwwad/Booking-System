@@ -1,50 +1,63 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Request } from 'express';
-import * as jwt from 'jsonwebtoken';
+import {
+  Injectable,
+  ExecutionContext,
+  Inject,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import {
+  AuthGuard as KeycloakAuthGuard,
+  KEYCLOAK_INSTANCE,
+  KEYCLOAK_CONNECT_OPTIONS,
+  KEYCLOAK_LOGGER,
+  KEYCLOAK_MULTITENANT_SERVICE,
+} from 'nest-keycloak-connect';
 import { ClsService } from 'nestjs-cls';
 import type { ClsStore } from '../cls/cls-store.interface';
+import { Request } from 'express';
+import { KeycloakSyncService } from '../../modules/auth/services/keycloak-sync.service';
 
-interface JwtPayload {
-  userId: string;
-  name: string;
+export interface KeycloakTokenPayload {
+  /** Keycloak user UUID — stored as `keycloakId` in the local `users` table. */
+  sub: string;
   email: string;
-  userRoles: string[];
-  customerId: string | null;
-  isAdmin?: boolean;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  realm_access?: {
+    roles: string[];
+  };
+  preferred_username?: string;
 }
 
 @Injectable()
-export class AuthGuard implements CanActivate {
+export class AuthGuard extends KeycloakAuthGuard {
   constructor(
-    private readonly configService: ConfigService,
+    @Inject(KEYCLOAK_INSTANCE) singleTenant: any,
+    @Inject(KEYCLOAK_CONNECT_OPTIONS) keycloakOpts: any,
+    @Inject(KEYCLOAK_LOGGER) logger: any,
+    @Inject(KEYCLOAK_MULTITENANT_SERVICE) multiTenant: any,
+    reflector: Reflector,
     private readonly cls: ClsService<ClsStore>,
-  ) {}
-
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>();
-    const token = this.extractTokenFromHeader(request);
-    if (!token) throw new UnauthorizedException('Unauthorized to perform this action!');
-
-    try {
-      const secret = this.configService.getOrThrow<string>('ACCESS_TOKEN_SECRET');
-      const payload = jwt.verify(token, secret) as JwtPayload;
-
-      request['user'] = payload;
-      // Set userId in CLS here — guard already has the decoded payload.
-      // Subscribers read this later inside transactions without any method threading.
-      this.cls.set('userId', payload.userId);
-    } catch (error) {
-      if ((error as Error).name === 'TokenExpiredError') {
-        throw new UnauthorizedException('Your token has expired!');
-      }
-      throw new UnauthorizedException('Unauthorized to perform this action!');
-    }
-    return true;
+    private readonly syncService: KeycloakSyncService,
+  ) {
+    super(singleTenant, keycloakOpts, logger, multiTenant, reflector);
   }
 
-  private extractTokenFromHeader(request: Request): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isActivated = await super.canActivate(context);
+
+    if (isActivated) {
+      const request = context.switchToHttp().getRequest<Request & { user: KeycloakTokenPayload }>();
+
+      if (request?.user?.sub) {
+        // Sync the KC user into the local DB (no-op after first login).
+        // localUser.id is the Postgres UUID we use everywhere in the app
+        // (audit logs, FK constraints, etc.) — NOT the KC sub.
+        const localUser = await this.syncService.syncUser(request.user);
+        this.cls.set('userId', localUser.id);
+      }
+    }
+
+    return isActivated;
   }
 }

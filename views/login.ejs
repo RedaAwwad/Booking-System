@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Booking System — Sign In</title>
+  <meta name="description" content="Sign in to the Booking System to manage flights and hotel reservations." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #080b14;
+      --surface:  #0d1220;
+      --border:   #1e2d4a;
+      --accent:   #3b82f6;
+      --accent-2: #6366f1;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --danger:   #f87171;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ── Animated gradient orbs ── */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.15;
+      pointer-events: none;
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+    .orb-1 { width: 500px; height: 500px; background: #3b82f6; top: -100px; left: -100px; animation-duration: 14s; }
+    .orb-2 { width: 400px; height: 400px; background: #6366f1; bottom: -80px; right: -80px; animation-duration: 10s; animation-delay: -4s; }
+    .orb-3 { width: 300px; height: 300px; background: #06b6d4; top: 40%; left: 60%; animation-duration: 16s; animation-delay: -2s; }
+
+    @keyframes drift {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(40px, 20px) scale(1.08); }
+    }
+
+    /* ── Card ── */
+    .card {
+      position: relative;
+      background: linear-gradient(135deg, rgba(13,18,32,0.95), rgba(8,11,20,0.98));
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 44px 40px;
+      width: 100%;
+      max-width: 420px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(59,130,246,0.06);
+      animation: rise 0.5s cubic-bezier(0.16,1,0.3,1) both;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(24px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ── Brand ── */
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .brand-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .brand-name {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #e2e8f0, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .subtitle {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 36px;
+      line-height: 1.5;
+    }
+
+    /* ── Error banner ── */
+    #error-msg {
+      display: none;
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: 10px;
+      color: var(--danger);
+      font-size: 13px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      line-height: 1.4;
+    }
+
+    /* ── Sign-in button ── */
+    #signin-btn {
+      width: 100%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none;
+      border-radius: 12px;
+      padding: 15px 20px;
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px rgba(59,130,246,0.3);
+      letter-spacing: 0.1px;
+    }
+    #signin-btn:hover  { opacity: 0.92; box-shadow: 0 6px 28px rgba(59,130,246,0.45); }
+    #signin-btn:active { transform: scale(0.98); }
+    #signin-btn:disabled {
+      background: #1e2d4a;
+      box-shadow: none;
+      cursor: not-allowed;
+      color: var(--muted);
+    }
+
+    .btn-icon { font-size: 18px; }
+    .spinner { display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 28px 0 20px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* ── Info badge ── */
+    .info-badge {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: rgba(59,130,246,0.06);
+      border: 1px solid rgba(59,130,246,0.15);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 12px;
+      color: #93c5fd;
+      line-height: 1.5;
+    }
+    .info-badge .icon { font-size: 14px; margin-top: 1px; flex-shrink: 0; }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 11px;
+      color: #334155;
+    }
+  </style>
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="card">
+    <div class="brand">
+      <div class="brand-icon">✈️</div>
+      <span class="brand-name">BookingSystem</span>
+    </div>
+
+    <h1>Welcome back</h1>
+    <p class="subtitle">Sign in to manage flights and hotel reservations.</p>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+    <div id="error-msg" style="display:block"><%= error %></div>
+    <% } %>
+    <div id="error-msg"></div>
+
+    <button id="signin-btn" onclick="startPkce()">
+      <div class="spinner" id="spinner"></div>
+      <span class="btn-icon" id="btn-icon">🔐</span>
+      <span id="btn-text">Continue with Keycloak</span>
+    </button>
+
+    <div class="divider">developer info</div>
+
+    <div class="info-badge">
+      <span class="icon">ℹ️</span>
+      <span>
+        You'll be redirected to Keycloak for authentication using the
+        <strong>Authorization Code + PKCE</strong> flow.
+        After sign-in you'll land on the API docs page.
+      </span>
+    </div>
+
+    <p class="footer">Booking System &mdash; Internal Developer Portal</p>
+  </div>
+
+  <script>
+    // ── PKCE helpers ──────────────────────────────────────────────────────────
+
+    function randomBase64url(byteLength) {
+      const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
+      return btoa(String.fromCharCode(...bytes))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    async function sha256Base64url(plain) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(plain);
+      const hash = await crypto.subtle.digest('SHA-256', data);
+      return btoa(String.fromCharCode(...new Uint8Array(hash)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    // ── KC config injected by NestJS ─────────────────────────────────────────
+    const KC_URL      = '<%= keycloakUrl %>';
+    const REALM       = '<%= realm %>';
+    const CLIENT_ID   = '<%= clientId %>';
+    const CALLBACK_URL = '<%= callbackUrl %>';
+
+    // ── Launch PKCE flow ──────────────────────────────────────────────────────
+    async function startPkce() {
+      const btn     = document.getElementById('signin-btn');
+      const spinner = document.getElementById('spinner');
+      const icon    = document.getElementById('btn-icon');
+      const text    = document.getElementById('btn-text');
+      const errEl   = document.getElementById('error-msg');
+
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      spinner.style.display = 'block';
+      icon.style.display    = 'none';
+      text.textContent = 'Redirecting to Keycloak…';
+
+      try {
+        const codeVerifier  = randomBase64url(96);
+        const codeChallenge = await sha256Base64url(codeVerifier);
+        const state         = randomBase64url(16);
+
+        // Persist verifier and state across the redirect
+        sessionStorage.setItem('pkce_verifier', codeVerifier);
+        sessionStorage.setItem('pkce_state', state);
+        sessionStorage.setItem('pkce_callback', CALLBACK_URL);
+
+        const params = new URLSearchParams({
+          client_id:             CLIENT_ID,
+          redirect_uri:          CALLBACK_URL,
+          response_type:         'code',
+          scope:                 'openid profile email roles',
+          code_challenge:        codeChallenge,
+          code_challenge_method: 'S256',
+          state,
+        });
+
+        const authUrl = `${KC_URL}/realms/${REALM}/protocol/openid-connect/auth?${params}`;
+        window.location.href = authUrl;
+      } catch (err) {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+        icon.style.display    = 'inline';
+        text.textContent = 'Continue with Keycloak';
+        errEl.textContent   = 'Failed to start login: ' + err.message;
+        errEl.style.display = 'block';
+      }
+    }
+
+    // Allow Enter key to trigger login
+    document.addEventListener('keydown', (e) => { if (e.key === 'Enter') startPkce(); });
+
+    // Automatically trigger PKCE redirect on page load if there is no error displayed
+    window.addEventListener('DOMContentLoaded', () => {
+      const errEl = document.getElementById('error-msg');
+      if (!errEl.textContent || !errEl.textContent.trim()) {
+        startPkce();
+      }
+    });
+  </script>
+</body>
+</html>

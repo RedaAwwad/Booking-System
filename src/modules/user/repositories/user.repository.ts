@@ -54,6 +54,10 @@ export class UserRepository {
     return rows.length > 0;
   }
 
+  async findUserByKeycloakId(keycloakId: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { keycloakId } });
+  }
+
   async findUserByEmail(email: string, select?: FindOptionsSelect<User>): Promise<User | null> {
     return this.userRepository.findOne({ where: { email }, select });
   }
