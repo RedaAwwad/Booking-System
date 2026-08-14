@@ -32,4 +32,8 @@ export class UserModuleFacade implements IUserModuleApi {
   async assignRoleToUser(userId: string, roleKey: RoleKey, tx?: EntityManager): Promise<boolean> {
     return this.userService.assignRoleToUser(userId, roleKey, tx);
   }
+
+  async findUserIdByKeycloakId(keycloakId: string): Promise<User | null> {
+    return this.userService.findUserIdByKeycloakId(keycloakId);
+  }
 }

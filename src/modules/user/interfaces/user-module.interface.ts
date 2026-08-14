@@ -8,6 +8,7 @@ export interface IUserModuleApi {
   createUser(data: Partial<User>, tx?: EntityManager): Promise<User>;
   updateUserById(userId: string, data: Partial<User>): Promise<User>;
   findAndUpdateUserByEmail(userId: string, email: string, data: Partial<User>): Promise<User>;
+  findUserIdByKeycloakId(keycloakId: string): Promise<User | null>;
   assignRoleToUser(userId: string, roleKey: RoleKey, tx?: EntityManager): Promise<boolean>;
 }
 
