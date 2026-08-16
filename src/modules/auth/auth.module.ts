@@ -19,4 +19,4 @@ import { KeycloakModule } from './keycloak.module';
   providers: [KeycloakAdminService],
   exports: [KeycloakModule, KeycloakAdminService],
 })
-export class AuthModule {}
+export class AuthModule { }

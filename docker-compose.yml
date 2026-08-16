@@ -115,8 +115,6 @@ services:
       - node-app
     restart: unless-stopped
 
-  # ── Keycloak IAM (opt-in via --profile auth) ─────────────────────────────────
-
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.4
     container_name: booking_keycloak
