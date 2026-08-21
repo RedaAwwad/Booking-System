@@ -28,8 +28,17 @@ export class DuffelFlightsAdapter implements IFlightProvider {
   constructor(private readonly configService: ConfigService) {
     this.logger = new Logger(this.providerName);
     const token = this.configService.get<string>('DUFFEL_API_TOKEN');
+    this.logger.log(
+      `DUFFEL_API_TOKEN status: ${token ? `Loaded (starts with ${token.substring(0, 7)})` : 'MISSING / UNDEFINED'}`,
+    );
+
+    if (!token) {
+      throw new Error(
+        'DUFFEL_API_TOKEN is missing or undefined! Check your .env file and ConfigModule setup.',
+      );
+    }
     this.duffel = new Duffel({
-      token: token ?? '',
+      token,
     });
   }
 

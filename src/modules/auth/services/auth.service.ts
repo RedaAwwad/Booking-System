@@ -25,7 +25,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   async signup(dto: SignupDto) {
     const existingUser = await this.userModuleFacade.findUserByEmail(dto.email);
@@ -40,7 +40,7 @@ export class AuthService {
         email: dto.email,
         password: hashedPassword,
         isActive: true,
-        isConfirmed: false, // will require email verification
+        isConfirmed: process.env.SKIP_EMAIL_VERIFICATION === 'true', // true in perf/dev envs only
       }, tx);
 
       await this.userModuleFacade.assignRoleToUser(newUser.id, RoleKey.CUSTOMER, tx);
@@ -67,9 +67,9 @@ export class AuthService {
       id: true, email: true, password: true, name: true,
       isActive: true, isConfirmed: true, isAdmin: true, roles: true,
     });
-    
+
     if (!user || !user.password) throw new UnauthorizedException('Invalid credentials');
-    
+
     const isValidPassword = await verifyPassword(dto.password, user.password);
     if (!isValidPassword) throw new UnauthorizedException('Invalid credentials');
 
@@ -80,14 +80,24 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string) {
-    const validToken = await this.userTokenService.verifyToken(refreshToken, TokenType.REFRESH);
-    const user = await this.userModuleFacade.findUserById(validToken.userId);
-    if (!user || !user.isActive) throw new UnauthorizedException('Invalid or deactivated user');
+    try {
+      const validToken = await this.userTokenService.verifyToken(refreshToken, TokenType.REFRESH);
+      const user = await this.userModuleFacade.findUserById(validToken.userId);
 
-    // Invalidate old refresh token
-    await this.userTokenService.deleteToken(refreshToken);
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('Invalid or deactivated user');
+      }
 
-    return this.generateTokens(user);
+      await this.userTokenService.deleteToken(refreshToken);
+      return await this.generateTokens(user);
+    } catch (error) {
+      // If it's already an HTTP exception (like 401), rethrow it
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      // Otherwise, convert any JWT verification or DB lookup error into a clean 401 instead of a 500 crash
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
 
   async logout(refreshToken: string) {
@@ -202,8 +212,8 @@ export class AuthService {
       isAdmin: user.isAdmin,
     };
 
-    const accessTokenExpiry = this.configService.getOrThrow<number>('ACCESS_TOKEN_EXPIRY');
-    const refreshTokenExpiry = this.configService.getOrThrow<number>('REFRESH_TOKEN_EXPIRY');
+    const accessTokenExpiry = parseInt(this.configService.getOrThrow('ACCESS_TOKEN_EXPIRY'), 10);
+    const refreshTokenExpiry = parseInt(this.configService.getOrThrow('REFRESH_TOKEN_EXPIRY'), 10);
     const accessTokenSecret = this.configService.getOrThrow<string>('ACCESS_TOKEN_SECRET');
     const refreshTokenSecret = this.configService.getOrThrow<string>('REFRESH_TOKEN_SECRET');
 

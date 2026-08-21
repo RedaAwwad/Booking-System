@@ -8,10 +8,10 @@ services:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
-    command: ["redis-server", "--appendonly", "yes"]
+    command: [ "redis-server", "--appendonly", "yes" ]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,7 +21,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.postgres
-      
+
     container_name: booking_postgres # (Use booking_postgres_prod for the prod file)
     restart: unless-stopped
     ports:
@@ -32,20 +32,31 @@ services:
       POSTGRES_DB: ${DATABASE_NAME}
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      
+
     # 2. Update the command to preload the library and set the cron database
     command: >
-      postgres 
-      -c "max_connections=200" 
-      -c "shared_preload_libraries=pg_cron" 
-      -c "cron.database_name=${DATABASE_NAME}"
-      -c "cron.use_background_workers=on"
-      
+      postgres  -c "max_connections=200"  -c "shared_preload_libraries=pg_cron"  -c "cron.database_name=${DATABASE_NAME}" -c "cron.use_background_workers=on"
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:9.8
+    ports:
+      - 5050:80
+    environment:
+      # Required by pgAdmin
+      PGADMIN_DEFAULT_EMAIL: demo@example.com
+      PGADMIN_DEFAULT_PASSWORD: secret
+
+      # Don't require the user to login
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+
+      # Don't require a "master" password after logging in
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
 
   rabbitmq:
     image: rabbitmq:4.3.1-management-alpine
@@ -60,7 +71,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -70,7 +81,6 @@ services:
     build:
       context: .
       target: development
-    profiles: [fullstack]
     volumes:
       - ./src:/app/src
     ports:
@@ -86,6 +96,12 @@ services:
       REDIS_PORT: 6379
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: 5000
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+      # ⚠️  Dev/perf only – lets k6 registerUser() skip email confirmation.
+      #     NEVER set this to 'true' in production.
+      SKIP_EMAIL_VERIFICATION: ${SKIP_EMAIL_VERIFICATION:-false}
     depends_on:
       redis:
         condition: service_healthy
@@ -93,6 +109,12 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      logstash:
+        condition: service_started
+      zipkin:
+        condition: service_started
     restart: unless-stopped
 
   nginx:
@@ -106,7 +128,105 @@ services:
       - node-app
     restart: unless-stopped
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    container_name: booking_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.license.self_generated.type=basic
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.17.0
+    container_name: booking_logstash
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+      # Multi-pipeline config (app logs on 5000, k6 metrics on 5001)
+      - ./logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+      # Shared host directory so Logstash can read completed k6 JSON result files
+      - ./k6/results:/k6-results:ro
+    ports:
+      - "${LOGSTASH_PORT:-5000}:5000" # NestJS app logs
+      - "${LOGSTASH_K6_PORT:-5001}:5001" # k6 performance metrics
+    environment:
+      LS_JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.0
+    container_name: booking_kibana
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  zipkin:
+    image: openzipkin/zipkin:3.4
+    container_name: booking_zipkin
+    ports:
+      - "${ZIPKIN_PORT:-9411}:9411"
+    restart: unless-stopped
+
+  # ─── k6 Performance Tests ─────────────────────────────────────────────────
+  # Usage (run against the running stack):
+  #   docker compose --profile perf run --rm k6 smoke
+  #   docker compose --profile perf run --rm k6 load
+  #   docker compose --profile perf run --rm k6 stress
+  #   docker compose --profile perf run --rm k6 spike
+  #   docker compose --profile perf run --rm k6 soak
+  #   docker compose --profile perf run --rm k6 breakpoint
+  #   docker compose --profile perf run --rm k6 auth
+  #   docker compose --profile perf run --rm k6 concurrency
+  k6:
+    image: grafana/k6:latest
+    container_name: booking_k6
+    profiles: [ "perf" ]
+    volumes:
+      - ./k6:/scripts
+      # Shared host directory – completed JSON result files land here;
+      # Logstash picks them up via the file input in k6-metrics.conf
+      - ./k6/results:/k6-results
+    environment:
+      K6_BASE_URL: ${K6_BASE_URL:-http://nginx:80}
+      K6_SOAK_DURATION: ${K6_SOAK_DURATION:-30m}
+      # Tell k6 where to stream live metrics (Logstash k6 pipeline)
+      K6_LOGSTASH_HOST: logstash
+      K6_LOGSTASH_PORT: 5001
+    # Entrypoint expects sh -c to execute the inline script
+    # $1 will receive "smoke", "load", "stress", etc. passed via CLI or command
+    entrypoint: [ "sh", "/scripts/run.sh" ]
+    command: [ "smoke" ]
+    depends_on:
+      - nginx
+      - logstash
+    networks:
+      - default
+
 volumes:
   redis_data:
   postgres_data:
   rabbitmq_data:
+  elasticsearch_data:
+

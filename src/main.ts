@@ -1,11 +1,16 @@
+import './tracing'; // Must be the first import to initialize OpenTelemetry instrumentation
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { SanitizePipe } from './common/sanitize/sanitize.pipe';
+import { CustomLogger } from './common/logger/logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(CustomLogger));
+  app.use(cookieParser());
 
   app.setGlobalPrefix('api/v1', {
     exclude: ['/', '/health', '/api-docs'],
@@ -43,9 +48,11 @@ async function bootstrap() {
   console.log('The App is running on port', process.env.PORT ?? 3000);
   console.log(
     'The API documentation is available via: http://localhost:' +
-      (process.env.PORT ?? 3000) +
-      '/api-docs',
+    (process.env.PORT ?? 3000) +
+    '/api-docs',
   );
+
+
 }
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises

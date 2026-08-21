@@ -4,7 +4,7 @@ import { RoleKey } from '../../../common/enums/role-key.enum';
 
 @Injectable()
 export class RoleService {
-  constructor(private readonly roleRepository: RoleRepository) {}
+  constructor(private readonly roleRepository: RoleRepository) { }
 
   async createRole(data: { name: string; desc?: string; key: RoleKey }) {
     const existingRole = await this.roleRepository.findRoleByKey(data.key);
