@@ -1,0 +1,42 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: false
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      # Clicking a span in a trace jumps to the matching Loki logs.
+      # This LogQL query reuses the trace_id field your app already
+      # writes on every SearchEvent (from Phase 2).
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-5m'
+        spanEndTimeShift: '5m'
+        filterByTraceID: true
+        customQuery: true
+        query: '{job="booking-api"} | json | trace_id="${__span.traceId}"'
+      serviceMap:
+        datasourceUid: prometheus
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      # The reverse link: clicking trace_id inside a log line in Grafana
+      # opens the matching Tempo trace directly.
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: '"trace_id":"(\w+)"'
+          name: TraceID
+          url: '$${__value.raw}'

@@ -148,5 +148,6 @@ export class FlightExternalApiService {
       ),
     );
     return Promise.race([promise, timeout]);
+
   }
 }

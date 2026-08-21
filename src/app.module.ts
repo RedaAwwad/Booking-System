@@ -38,7 +38,7 @@ import { LoggerModule } from './common/logger/logger.module';
     AuthModule,
     UserModule,
     CustomerModule,
-    LoggerModule,
+    LoggerModule
   ],
   controllers: [AppController],
   providers: [AppService],

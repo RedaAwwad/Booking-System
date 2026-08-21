@@ -109,8 +109,6 @@ export class DuffelFlightsAdapter implements IFlightProvider {
   private formatFlightResponse(providerFlight: DuffelFlightOffer): Flight {
     const flight = providerFlight;
 
-    this.logger.warn('flight = > ', flight);
-
     return {
       id: flight.id,
       source: this.providerName,

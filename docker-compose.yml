@@ -96,9 +96,8 @@ services:
       REDIS_PORT: 6379
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
-      LOGSTASH_HOST: logstash
-      LOGSTASH_PORT: 5000
-      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+      LOKI_URL: http://loki:3100
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       # ⚠️  Dev/perf only – lets k6 registerUser() skip email confirmation.
       #     NEVER set this to 'true' in production.
       SKIP_EMAIL_VERIFICATION: ${SKIP_EMAIL_VERIFICATION:-false}
@@ -109,11 +108,9 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
-      logstash:
+      loki:
         condition: service_started
-      zipkin:
+      otel-collector:
         condition: service_started
     restart: unless-stopped
 
@@ -128,77 +125,78 @@ services:
       - node-app
     restart: unless-stopped
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
-    container_name: booking_elasticsearch
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - xpack.license.self_generated.type=basic
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    ports:
-      - "${ELASTICSEARCH_PORT:-9200}:9200"
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.108.0
+    container_name: booking_otel_collector
+    command: [ "--config=/etc/otel-collector-config.yaml" ]
     volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
+      - ./monitoring/otel/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317" # OTLP gRPC — app traces come in here
+      - "4318:4318" # OTLP HTTP
+    depends_on:
+      - tempo
     restart: unless-stopped
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.17.0
-    container_name: booking_logstash
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: booking_tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
-      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
-      # Multi-pipeline config (app logs on 5000, k6 metrics on 5001)
-      - ./logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
-      # Shared host directory so Logstash can read completed k6 JSON result files
-      - ./k6/results:/k6-results:ro
+      - ./monitoring/tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
     ports:
-      - "${LOGSTASH_PORT:-5000}:5000" # NestJS app logs
-      - "${LOGSTASH_K6_PORT:-5001}:5001" # k6 performance metrics
+      - "3200:3200" # Tempo query API, used by Grafana
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: booking_loki
+    command: [ "-config.file=/etc/loki/local-config.yaml" ]
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: booking_prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: booking_grafana
+    ports:
+      # NOTE: host port 3001, not 3000 — node-app already owns 3000.
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
     environment:
-      LS_JAVA_OPTS: "-Xms256m -Xmx512m"
+      # Dev-only convenience — don't ship this to a shared/prod environment.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
     depends_on:
-      elasticsearch:
-        condition: service_healthy
+      - prometheus
+      - loki
+      - tempo
     restart: unless-stopped
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.17.0
-    container_name: booking_kibana
-    ports:
-      - "${KIBANA_PORT:-5601}:5601"
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    restart: unless-stopped
-
-  zipkin:
-    image: openzipkin/zipkin:3.4
-    container_name: booking_zipkin
-    ports:
-      - "${ZIPKIN_PORT:-9411}:9411"
-    restart: unless-stopped
-
-  # ─── k6 Performance Tests ─────────────────────────────────────────────────
-  # Usage (run against the running stack):
-  #   docker compose --profile perf run --rm k6 smoke
-  #   docker compose --profile perf run --rm k6 load
-  #   docker compose --profile perf run --rm k6 stress
-  #   docker compose --profile perf run --rm k6 spike
-  #   docker compose --profile perf run --rm k6 soak
-  #   docker compose --profile perf run --rm k6 breakpoint
-  #   docker compose --profile perf run --rm k6 auth
-  #   docker compose --profile perf run --rm k6 concurrency
+    # ─── k6 Performance Tests ─────────────────────────────────────────────────
+    # Usage (run against the running stack):
+    #   docker compose --profile perf run --rm k6 smoke
+    #   docker compose --profile perf run --rm k6 load
+    #   docker compose --profile perf run --rm k6 stress
+    #   docker compose --profile perf run --rm k6 spike
+    #   docker compose --profile perf run --rm k6 soak
+    #   docker compose --profile perf run --rm k6 breakpoint
+    #   docker compose --profile perf run --rm k6 auth
+    #   docker compose --profile perf run --rm k6 concurrency
   k6:
     image: grafana/k6:latest
     container_name: booking_k6
@@ -212,6 +210,11 @@ services:
       K6_BASE_URL: ${K6_BASE_URL:-http://nginx:80}
       K6_SOAK_DURATION: ${K6_SOAK_DURATION:-30m}
       # Tell k6 where to stream live metrics (Logstash k6 pipeline)
+      # NOTE: k6's Logstash streaming output was removed along with the ELK
+      # stack. run-tests.ps1 degrades gracefully if this isn't reachable,
+      # but if you want live k6 metrics in the new stack, k6 supports a
+      # `xk6-output-prometheus-remote` output pointed at Prometheus's
+      # remote-write endpoint — that's a separate follow-up, not done here.
       K6_LOGSTASH_HOST: logstash
       K6_LOGSTASH_PORT: 5001
     # Entrypoint expects sh -c to execute the inline script
@@ -220,7 +223,6 @@ services:
     command: [ "smoke" ]
     depends_on:
       - nginx
-      - logstash
     networks:
       - default
 
@@ -228,5 +230,7 @@ volumes:
   redis_data:
   postgres_data:
   rabbitmq_data:
-  elasticsearch_data:
-
+  tempo_data:
+  loki_data:
+  prometheus_data:
+  grafana_data:
