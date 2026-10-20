@@ -17,6 +17,21 @@ import {
   FlightapiCarrier,
 } from './flightapi.types';
 import { Flight, CabinClass } from '../../flights/types/flights.types';
+const fs = require('node:fs');
+
+function logToFile(message) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+
+  // Appends the log message to 'app.log'. Creates the file if it does not exist.
+  fs.appendFile('app.log', logMessage, (err) => {
+    if (err) {
+      console.error('Failed to write log:', err);
+    }
+  });
+}
+
+
 
 @Injectable()
 export class FlightApiAdapter implements IFlightProvider {
@@ -38,12 +53,14 @@ export class FlightApiAdapter implements IFlightProvider {
     try {
       const url = this.buildUrl(query);
       const response = await firstValueFrom(this.httpService.get(url));
+      logToFile(response)
 
       if (response.status !== 200) {
         throw new Error(
           `${this.providerName} returned status ${response.status}`,
         );
       }
+
 
       const data = response.data as FlightapiResponse;
       const itineraries = data.itineraries || [];
@@ -76,6 +93,8 @@ export class FlightApiAdapter implements IFlightProvider {
     const infants = 0; // Flightapi requires infants count
     const cabin = this.mapCabinClass(query.cabin_class);
     const currency = query.currency || 'USD';
+
+    logToFile(`${this.baseUrl}/${this.apiKey}/${query.origin}/${query.destination}/${query.departure_date}/${adults}/${children}/${infants}/${cabin}/${currency}`)
 
     return `${this.baseUrl}/${this.apiKey}/${query.origin}/${query.destination}/${query.departure_date}/${adults}/${children}/${infants}/${cabin}/${currency}`;
   }

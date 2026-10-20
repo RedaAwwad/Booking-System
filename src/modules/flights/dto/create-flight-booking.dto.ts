@@ -37,5 +37,9 @@ export class CreateFlightBookingDto {
   currency?: string;
 
   @IsString()
+  @IsOptional()
+  provider?: string; // e.g. "duffel", "flightapi"
+
+  @IsString()
   paymentMethod: string;
 }

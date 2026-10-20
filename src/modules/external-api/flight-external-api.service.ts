@@ -1,4 +1,3 @@
-import { trace } from '@opentelemetry/api';
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { IFlightProvider } from '../providers/interfaces/flight-provider.interface';
 import { Flight } from '../flights/types/flights.types';
@@ -31,29 +30,32 @@ export class FlightExternalApiService {
   async handle(
     query: FlightsSearchDto,
   ): Promise<{ data: Flight[]; errors: any[] }> {
-    const activeSpan = trace.getActiveSpan();
-    const spanContext = activeSpan?.spanContext();
-    let SearchEvent = {
-      trace_id: spanContext?.traceId ?? null,
-      span_id: spanContext?.spanId ?? null,
+    // trace_id/span_id are no longer computed here — CustomLogger already
+    // injects them into every log call automatically (see getTraceContext()).
+    // Computing it again here was redundant and got silently overwritten.
+    const start = performance.now();
+    const cacheKey = buildCacheKey('flights', query);
+
+    const SearchEvent = {
       kind: "search",
       origin: query.origin,
       destination: query.destination,
       departure_date: query.departure_date,
       adults_count: query.adults_count,
-      cache_key: "",
+      cache_key: cacheKey,
       cache_hit: false,
-      providers_called: [""],
+      providers_called: [] as string[],
       providers_result: [] as ProviderResult[],
       total_results: 0,
       duration_ms: 0,
-      cache_write_status: "",
+      cache_write_status: '' as 'ok' | 'failed' | 'not_attempted',
       timestamp: new Date(),
     };
 
-    const start = performance.now();
-    const cacheKey = buildCacheKey('flights', query);
-    SearchEvent.cache_key = cacheKey;
+    const emit = () => {
+      SearchEvent.duration_ms = performance.now() - start;
+      this.logger.log(SearchEvent);
+    };
 
     const cached = await this.cacheService.get<{
       data: Flight[];
@@ -65,26 +67,18 @@ export class FlightExternalApiService {
       cached.data.forEach(flight => {
         sourceCounts.set(flight.source, (sourceCounts.get(flight.source) || 0) + 1);
       });
-      SearchEvent.providers_called = Object.keys(sourceCounts);
+      SearchEvent.providers_called = Array.from(sourceCounts.keys());
+      SearchEvent.providers_result = Array.from(sourceCounts.entries()).map(
+        ([provider, count]) => ({ provider, results_count: count }),
+      );
+      SearchEvent.total_results = cached.data.length;
+      SearchEvent.cache_write_status = 'not_attempted';
 
-
-      SearchEvent.providers_result = Object.entries(sourceCounts).map(([source, count]) => ({
-        provider: source,
-        results_count: count
-      }));
-
-      this.logger.log(SearchEvent)
-      //this.logger.log(`Cache HIT — key: ${cacheKey}`);
+      emit(); // duration_ms is now computed on this path too
       return cached;
     }
 
-
-    /*this.logger.log(
-      `Cache MISS — starting aggregation for ${this.providers.length} providers: ${this.providers.map((p) => p.providerName).join(', ')}`,
-    );*/
-
     SearchEvent.cache_hit = false
-    //SearchEvent.providers_called = this.providers.map((p) => p.providerName)
     const results = await Promise.allSettled(
       this.providers.map((provider) =>
         this.withTimeout(
@@ -99,40 +93,34 @@ export class FlightExternalApiService {
     const errors: any[] = [];
 
     results.forEach((result, index) => {
-
       const providerName = this.providers[index].providerName;
       SearchEvent.providers_called.push(providerName)
 
       if (result.status === 'fulfilled') {
         data.push(...result.value);
-        /*this.logger.log(
-          `Successfully gathered ${result.value.length} results from ${providerName}`,
-        );*/
         SearchEvent.providers_result.push({ provider: providerName, results_count: result.value.length })
       } else {
         const errorMsg = (result.reason as Error)?.message || 'Unknown Error';
-        //this.logger.error(`Provider ${providerName} failed: ${errorMsg}`);
         SearchEvent.providers_result.push({ provider: providerName, error_messages: errorMsg })
         errors.push({ provider: providerName, error: errorMsg });
       }
     });
 
     const response = { data, errors };
+    SearchEvent.total_results = data.length
 
     if (data.length > 0) {
-      SearchEvent.total_results = data.length
       try {
         await this.cacheService.set(cacheKey, response);
         SearchEvent.cache_write_status = "ok"
-        //this.logger.log(`Cached ${data.length} results — key: ${cacheKey}`);
       } catch (error) {
         SearchEvent.cache_write_status = "failed"
       }
+    } else {
+      SearchEvent.cache_write_status = 'not_attempted';
     }
-    const end = performance.now();
-    SearchEvent.duration_ms = end - start
 
-    this.logger.log(SearchEvent)
+    emit();
     return response;
   }
 
@@ -148,6 +136,5 @@ export class FlightExternalApiService {
       ),
     );
     return Promise.race([promise, timeout]);
-
   }
 }
